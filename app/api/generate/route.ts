@@ -5,7 +5,7 @@ import type { WorldState, LogEntry } from '@/types'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const STYLE_SUFFIX =
-  '2D layered paper cut illustration, visible depth between layers with drop shadows, grainy film texture overlay, rough edges, screen printing aesthetic, coarse grain noise, visible layer separation with dark shadow gaps between foreground midground and background, hand-crafted feel, NOT smooth NOT glossy NOT photorealistic, dark moody palette, warm amber light source, silhouette foreground layer, atmospheric haze in background, imperfect textures, risograph printing style, no text, no letters'
+`Flat illustration with subtle paper texture and soft grain. Layered depth: distant mountains/hills fade into misty background, mid-ground has rolling terrain or gentle landscape forms, foreground has darker silhouetted elements. Color palette: muted earthy tones — sage greens, dusty blues, warm terracotta, soft peach, golden amber, deep indigo. Soft atmospheric haze between layers. No photorealism, no heavy outlines. Painterly brushwork feel with visible texture, like hand-painted gouache on textured paper. Gentle glowing light from behind or above, warm ambient mood. Nature-inspired: hills, valleys, water, sky, wind, light. Contemplative and poetic atmosphere. Wide 16:9 landscape composition filling the entire frame. No text, no letters, no borders, no frames, no tarot/mandala patterns.`
 
 export async function POST(request: Request) {
   try {
@@ -14,16 +14,24 @@ export async function POST(request: Request) {
       spatialDescription,
       logEntry,
       triggeredBy = 'user',
+      userIntent,
+      previousInterpretation,
+      spatialDetail,
     }: {
       interpretation: string
       spatialDescription?: string
       logEntry: Omit<LogEntry, 'worldStateId'>
       triggeredBy: 'user' | 'ai'
+      userIntent?: 'agree' | 'reject' | 'modify' | 'initial'
+      previousInterpretation?: string
+      spatialDetail?: string
     } = await request.json()
 
-    // Convert spatial description to an English composition instruction for DALL-E
+    // Build composition instruction from spatial detail (preferred) or spatial description
     let compositionInstruction = ''
-    if (spatialDescription) {
+    if (spatialDetail) {
+      compositionInstruction = spatialDetail
+    } else if (spatialDescription) {
       const compRes = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -46,9 +54,23 @@ Example output: "a tall form centered, an arc shape beneath it, small scattered 
         compRes.choices[0].message.content?.trim() ?? ''
     }
 
-    const prompt = compositionInstruction
-      ? `${compositionInstruction}, ${interpretation}, ${STYLE_SUFFIX}`
-      : `${interpretation}, ${STYLE_SUFFIX}`
+    // Build intent-aware prompt based on user's physical feedback
+    let intentPrefix = ''
+    if (userIntent && previousInterpretation) {
+      if (userIntent === 'agree') {
+        intentPrefix = `Continuing the visual journey from "${previousInterpretation}", naturally evolving: `
+      } else if (userIntent === 'reject') {
+        intentPrefix = `Shifting away from "${previousInterpretation}", exploring a new direction: `
+      } else if (userIntent === 'modify') {
+        intentPrefix = `Building upon "${previousInterpretation}", refining the vision: `
+      }
+    }
+
+    const basePrompt = compositionInstruction
+      ? `${intentPrefix}${compositionInstruction}, ${interpretation}`
+      : `${intentPrefix}${interpretation}`
+
+    const prompt = `Wide cinematic landscape (16:9 aspect ratio, full frame composition): ${basePrompt}. ${STYLE_SUFFIX}`
 
     const imageResponse = await openai.images.generate({
       model: 'dall-e-3',

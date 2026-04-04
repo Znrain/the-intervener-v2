@@ -104,6 +104,13 @@ html, body {
   flex: 1;
 }
 
+.caption-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* ─── Floating camera PIP ──────────────────────────────────────────── */
 .camera-float {
   position: absolute;
@@ -238,6 +245,107 @@ html, body {
 }
 .restart-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* ─── Evolution controls ─────────────────────────────────────────── */
+.evolve-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evolve-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.evolve-once-btn {
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text-ghost);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.evolve-once-btn:hover:not(:disabled) {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+.evolve-once-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.evolve-mode-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.mode-pill {
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--text-ghost);
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-pill:hover {
+  color: var(--text-dim);
+}
+
+.mode-pill-active {
+  background: rgba(74, 159, 200, 0.12);
+  color: var(--accent-blue);
+}
+
+.evolve-interval-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.interval-label {
+  font-size: 11px;
+  color: var(--text-ghost);
+}
+
+.interval-input {
+  width: 40px;
+  padding: 4px 6px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.interval-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.interval-input::-webkit-inner-spin-button,
+.interval-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.interval-input { -moz-appearance: textfield; }
+
+.evolve-status {
+  font-size: 10px;
+  color: var(--text-ghost);
+  letter-spacing: 0.04em;
+}
+
 .status-bar {
   display: flex;
   align-items: center;
@@ -278,6 +386,15 @@ html, body {
   color: var(--text-ghost);
 }
 
+.scan-change-desc {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  font-style: italic;
+}
+
 /* ─── Right Panel ──────────────────────────────────────────────────── */
 .right-panel {
   display: flex;
@@ -301,11 +418,59 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 
+.interp-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.interp-time {
+  font-size: 11px;
+  color: var(--text-ghost);
+}
+
+.interp-source {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.return-current-btn {
+  padding: 3px 9px;
+  background: transparent;
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.return-current-btn:hover {
+  background: rgba(201, 168, 76, 0.12);
+}
+
 .interp-text {
   font-size: 17px;
   color: var(--text-primary);
   letter-spacing: 0.06em;
   line-height: 1.8;
+}
+
+.interp-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-ghost);
+  font-style: italic;
+  line-height: 1.6;
 }
 
 .interp-empty {
@@ -347,6 +512,19 @@ html, body {
   border-radius: 6px;
   padding: 10px 12px;
   border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.log-entry:hover {
+  border-color: rgba(201, 168, 76, 0.35);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.log-entry-active {
+  border-color: rgba(201, 168, 76, 0.5);
+  background: rgba(201, 168, 76, 0.08);
+  transform: translateX(-2px);
 }
 
 .log-meta {
@@ -397,6 +575,19 @@ html, body {
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.timeline-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timeline-item-active {
+  background: rgba(74, 159, 200, 0.08);
+  transform: translateX(-2px);
 }
 
 .timeline-dot {
@@ -455,6 +646,19 @@ html, body {
   background: rgba(74, 159, 200, 0.15);
   color: var(--ai-color);
   border: 1px solid rgba(74, 159, 200, 0.3);
+}
+
+.badge-history {
+  background: rgba(138, 143, 168, 0.15);
+  color: var(--text-dim);
+  border: 1px solid rgba(138, 143, 168, 0.3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.badge-history:hover {
+  background: rgba(138, 143, 168, 0.25);
+  color: var(--text-primary);
 }
 
 .hidden { display: none; }
