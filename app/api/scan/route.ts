@@ -7,6 +7,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 export async function POST(request: Request) {
   try {
     const { imageBase64, mimeType = 'image/jpeg' } = await request.json()
+    console.log('[API/scan] Received request', { imageBase64Length: imageBase64?.length, mimeType })
 
     if (!imageBase64) {
       return Response.json({ error: '缺少图片数据' }, { status: 400 })
@@ -15,13 +16,36 @@ export async function POST(request: Request) {
     const lastScan = getLastScan()
     const isInitial = lastScan === null
 
-    const systemPrompt = `你是一个观察积木的AI系统。用户将在桌面上摆放积木，你需要识别形状并推断用户意图。
-请以JSON格式返回结果，包含以下字段：
-- shapes: 识别到的形状列表（数组，每个元素是形状描述，例如"圆形"、"三角形"、"矩形"）
-- spatialRelationships: 描述这些形状之间的空间关系（一句话，中文）
-- spatialDetail: 用英文描述每个形状在画面中的具体位置、大小和方向，作为图像生成的构图参考。例如："a tall triangle in the upper left, a small circle near the center, a crescent shape on the right side tilted 45 degrees, three rectangles clustered at the bottom"
-- shapeCount: 形状总数量（数字）
-- rawDescription: 用一句话描述你看到的整体画面（中文）`
+    const systemPrompt = `You observe physical shapes (blocks, objects) placed on a flat surface and output a structured description suitable for image generation.
+
+Analyze the image and return a JSON object with these exact fields:
+
+1. shapes: Array of objects, each with:
+   - type: geometric shape name (circle, triangle, arc, crescent, rectangle, line, dot, square, hexagon, etc.)
+   - size: relative size as "large", "medium", or "small"
+   - position: one of "top-left", "top-center", "top-right", "center-left", "center", "center-right", "bottom-left", "bottom-center", "bottom-right"
+
+2. spatialDetail: A clear English composition description. Rules:
+   - Identify the dominant shapes and their approximate positions (top / center / bottom)
+   - Describe key relationships: what is above, below, beside, or surrounding what
+   - Note rough scale differences between elements (large vs small)
+   - Mention the overall compositional flow (vertically stacked, horizontally spread, centered, asymmetric, etc.)
+   - Keep it structured but natural — guide composition without over-specifying
+   - Do NOT use percentages, exact measurements, or micro-level alignment details
+   - Example: "A large circular form is placed near the upper center. Beneath it, layered curved bands extend across the lower half. Smaller circular and cloud-like elements are scattered around the central form. The composition is vertically centered with a dominant focal point."
+
+3. spatialRelationships: A single Chinese sentence describing spatial relationships between objects (e.g., "圆形在三角形上方，两个矩形并排位于底部")
+
+4. shapeCount: Total number of detected shapes (integer)
+
+5. rawDescription: One factual Chinese sentence describing the overall layout (e.g., "一个大圆形在上方，下方有一个弧形，左下角有两个小三角形")
+
+Rules:
+- Be clear and structured, not poetic
+- Use positional terms consistently
+- Describe scale differences naturally (large, small, scattered)
+- Do not interpret meaning, emotion, or intent
+- Do not describe lighting, color, or artistic style`
 
     const userContent: OpenAI.Chat.ChatCompletionContentPart[] = [
       {
@@ -46,10 +70,11 @@ export async function POST(request: Request) {
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },
-      max_tokens: 500,
+      max_tokens: 800,
     })
 
     const raw = JSON.parse(response.choices[0].message.content ?? '{}')
+    console.log('[API/scan] GPT-4o Vision raw response:', raw)
     const currentCount: number = raw.shapeCount ?? (raw.shapes?.length ?? 0)
     const lastCount = lastScan ? lastScan.shapes.length : 0
 
@@ -116,6 +141,7 @@ export async function POST(request: Request) {
     }
 
     setLastScan(result)
+    console.log('[API/scan] Returning result:', result)
     return Response.json(result)
   } catch (err) {
     console.error('[scan]', err)

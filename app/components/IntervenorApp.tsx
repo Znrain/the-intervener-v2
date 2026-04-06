@@ -30,8 +30,10 @@ export default function IntervenorApp() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   const [cameraReady, setCameraReady] = useState(false)
+  const [cameraOpening, setCameraOpening] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [statusMsg, setStatusMsg] = useState<string>('')
@@ -40,6 +42,7 @@ export default function IntervenorApp() {
   const [latestInterpretation, setLatestInterpretation] = useState<string>('')
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null)
   const [selectedWorldStateId, setSelectedWorldStateId] = useState<string | null>(null)
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null)
 
   // Evolution mode state
   const [evolveMode, setEvolveMode] = useState<EvolveMode>('manual')
@@ -53,23 +56,51 @@ export default function IntervenorApp() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-      .then((stream) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          setCameraReady(true)
-        }
-      })
-      .catch(() => {
-        setCameraError('无法访问摄像头')
+  const closeCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setCameraReady(false)
+    setCameraOpening(false)
+  }, [])
+
+  const openCamera = useCallback(async () => {
+    if (cameraReady || cameraOpening) return
+
+    setCameraOpening(true)
+    setCameraError(null)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
       })
 
+      streamRef.current = stream
+      setCameraReady(true)
+    } catch {
+      setCameraError('无法访问摄像头')
+    } finally {
+      setCameraOpening(false)
+    }
+  }, [cameraOpening, cameraReady])
+
+  // Connect stream to video element once it mounts
+  useEffect(() => {
+    if (cameraReady && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [cameraReady])
+
+  useEffect(() => {
     return () => {
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream
-        stream.getTracks().forEach((t) => t.stop())
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
       }
     }
   }, [])
@@ -82,9 +113,11 @@ export default function IntervenorApp() {
 
   // Shared pipeline: base64 → scan → interpret → generate
   const runPipeline = useCallback(async (base64: string, mimeType = 'image/jpeg') => {
+    console.log('[Pipeline] Starting pipeline', { mimeType, base64Length: base64.length })
     setPhase('scanning')
     setStatusMsg('正在识别形状……')
 
+    console.log('[Pipeline] → Sending to /api/scan:', { imageBase64Length: base64.length, mimeType })
     const scanRes = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,12 +128,14 @@ export default function IntervenorApp() {
       throw new Error(err.error ?? '识别接口错误')
     }
     const scan: ScanResult = await scanRes.json()
+    console.log('[Pipeline] ← /api/scan response:', scan)
     setLastScan(scan)
     setStatusMsg(`识别完成：${scan.shapes.join('、') || '未识别到形状'}`)
 
     setPhase('interpreting')
     setStatusMsg('正在解读……')
 
+    console.log('[Pipeline] → Sending to /api/interpret:', scan)
     const interpretRes = await fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,6 +146,7 @@ export default function IntervenorApp() {
       throw new Error(err.error ?? '解读接口错误')
     }
     const { interpretation, spatialDescription, logEntry } = await interpretRes.json()
+    console.log('[Pipeline] ← /api/interpret response:', { interpretation, spatialDescription, logEntry })
     setLatestInterpretation(interpretation)
     setStatusMsg(`解读：${interpretation}`)
 
@@ -122,23 +158,27 @@ export default function IntervenorApp() {
       ? worldData.worldStates[worldData.worldStates.length - 1]
       : null
 
+    const genPayload = {
+      interpretation,
+      spatialDescription,
+      spatialDetail: scan.spatialDetail,
+      logEntry,
+      triggeredBy: 'user',
+      userIntent: scan.userIntent,
+      previousInterpretation: previousWorld?.interpretation,
+    }
+    console.log('[Pipeline] → Sending to /api/generate:', genPayload)
     const genRes = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        interpretation,
-        spatialDescription,
-        spatialDetail: scan.spatialDetail,
-        logEntry,
-        triggeredBy: 'user',
-        userIntent: scan.userIntent,
-        previousInterpretation: previousWorld?.interpretation,
-      }),
+      body: JSON.stringify(genPayload),
     })
     if (!genRes.ok) {
       const err = await genRes.json().catch(() => ({ error: '未知错误' }))
       throw new Error(err.error ?? '生成接口错误')
     }
+    const genData = await genRes.json()
+    console.log('[Pipeline] ← /api/generate response:', genData)
 
     await refreshWorld()
     setStatusMsg('世界已更新')
@@ -149,7 +189,13 @@ export default function IntervenorApp() {
     if (phase !== 'idle' && phase !== 'done') return
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) { setStatusMsg('摄像头未就绪'); return }
+    if (!cameraReady || !video || !canvas) { setStatusMsg('请先打开摄像头'); return }
+
+    console.log('[Scan] Scan button clicked', {
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      readyState: video.readyState,
+    })
 
     canvas.width = video.videoWidth || 640
     canvas.height = video.videoHeight || 480
@@ -157,7 +203,14 @@ export default function IntervenorApp() {
     if (!ctx) return
     ctx.drawImage(video, 0, 0)
     const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1]
+    console.log('[Scan] Image captured', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      base64Length: base64.length,
+    })
+    setCapturedPreview(canvas.toDataURL('image/jpeg', 0.8))
     setUploadedPreview(null)
+    setCapturedPreview(null)
 
     try {
       await runPipeline(base64, 'image/jpeg')
@@ -167,7 +220,7 @@ export default function IntervenorApp() {
       setPhase('idle')
       console.error(err)
     }
-  }, [phase, runPipeline])
+  }, [cameraReady, phase, runPipeline])
 
   const handleUploadClick = useCallback(() => {
     if (phase !== 'idle' && phase !== 'done') return
@@ -204,6 +257,7 @@ export default function IntervenorApp() {
     setLatestInterpretation('')
     setLastScan(null)
     setUploadedPreview(null)
+    setCapturedPreview(null)
     setSelectedWorldStateId(null)
     setStatusMsg('')
     setPhase('idle')
@@ -300,10 +354,10 @@ export default function IntervenorApp() {
 
   return (
     <div className="intervener-layout">
-      {/* LEFT PANEL */}
+      {/* LEFT AREA — "Desk Surface": world image + camera + controls */}
       <div className="left-panel">
 
-        {/* World image — fixed window, camera floats inside */}
+        {/* ① World image — the main generated frame */}
         <div className="world-image-area">
           {currentWorld ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -331,13 +385,30 @@ export default function IntervenorApp() {
             </div>
           )}
 
-          {/* Floating camera PIP */}
+          {/* ② Camera PIP — floating camera/upload preview */}
           <div className="camera-float">
+            {!cameraReady && !cameraOpening && !cameraError && (
+              <button onClick={openCamera} className="camera-toggle-btn" title="打开摄像头">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 7l-7 5 7 5V7z"/>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+              </button>
+            )}
+            {cameraOpening && <div className="camera-float-error">正在打开摄像头…</div>}
             {cameraError ? (
               <div className="camera-float-error">{cameraError}</div>
-            ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="camera-float-video" />
-            )}
+            ) : cameraReady ? (
+              <>
+                <video ref={videoRef} autoPlay playsInline muted className="camera-float-video" />
+                <button onClick={closeCamera} className="camera-close-btn" title="关闭摄像头">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </>
+            ) : null}
             {uploadedPreview && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={uploadedPreview} alt="上传的图片" className="camera-float-upload" />
@@ -347,7 +418,7 @@ export default function IntervenorApp() {
           <canvas ref={canvasRef} className="hidden" />
         </div>
 
-        {/* Controls bar */}
+        {/* ③ Controls — scan, upload, evolve */}
         <div className="controls-bar">
           <div className="controls-row">
             <button onClick={handleScan} disabled={isBusy || !cameraReady} className="scan-btn">
@@ -434,11 +505,21 @@ export default function IntervenorApp() {
               )}
             </div>
           )}
+
+          {/* Debug: captured image preview */}
+          {capturedPreview && (
+            <div className="debug-capture-preview">
+              <div className="debug-capture-label">拍摄快照</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={capturedPreview} alt="captured frame" className="debug-capture-img" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
+      {/* RIGHT AREA — "Observation Notebook": echo + logs + timeline */}
       <div className="right-panel">
+        {/* ④ World echo + logs */}
         <div className="interp-section">
           <h2 className="section-title">世界的回声</h2>
           {currentWorld ? (
@@ -489,6 +570,7 @@ export default function IntervenorApp() {
           </div>
         </div>
 
+        {/* ⑤ Causal timeline */}
         <div className="timeline-section">
           <h2 className="section-title">因果时间线</h2>
           <div className="timeline-scroll">
