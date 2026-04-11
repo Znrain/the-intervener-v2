@@ -11,7 +11,20 @@ const TARGET_H = 1024
 const GEN_SIZE = '1024x1024'
 
 const STYLE_BLOCK = `STYLE:
-Flat abstract editorial illustration. Smooth gradient shapes, flowing organic curves, clean vector style, minimal grain texture, soft muted color palette, calm and atmospheric. No shadows, no 3D, no material thickness, no layered depth, no photorealism, no heavy outlines, no glossy rendering, no ornate decorative borders, no tarot-card framing, no symmetrical poster layouts, no text, no letters.`
+Poetic narrative illustration, hand-painted flat shapes, organic natural forms, environmental scene composition, storybook-like illustration, soft grain texture, gouache or screenprint feel, slightly imperfect edges, atmospheric and lyrical, full-scene composition. Not geometric, not a centered symbolic poster, not polished vector design. No shadows, no 3D, no material thickness, no photorealism, no heavy outlines, no glossy rendering, no ornate decorative borders, no tarot-card framing, no symmetrical poster layouts, no text, no letters.
+
+SHAPE TRANSLATION (CRITICAL):
+Do NOT render geometric shapes as abstract forms. Interpret them as natural or environmental elements:
+- circle → moon, sun, fruit, tree canopy, light source, opening in foliage
+- arc → flowing water, hills, branches, wind paths, river bends
+- triangle → mountain peaks, rooftops, tents, rock formations, tree tops
+- crescent → moon phases, curved shoreline, bent branch
+- rectangle → buildings, doorways, stones, book, path segments
+- dots → stars, seeds, particles, leaves, dust, fireflies, distant birds
+- line → horizon, path, river, branch, ray of light
+- cluster → grove, flock, constellation, gathering
+
+The structure must be preserved, but expressed through organic, natural visual language. The result must feel like a poetic world, not geometric abstraction.`
 
 function buildIntentHint(
   userIntent?: 'agree' | 'reject' | 'modify' | 'initial',

@@ -6,8 +6,14 @@ export interface WorldState {
   triggeredBy: 'user' | 'ai'
 }
 
+export interface ShapeObject {
+  type: string
+  size: 'large' | 'medium' | 'small'
+  position: string
+}
+
 export interface ScanResult {
-  shapes: string[]
+  shapes: ShapeObject[]
   spatialRelationships: string
   spatialDetail?: string
   changeFromLast: 'added' | 'removed' | 'moved' | 'none'

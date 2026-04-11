@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { WorldState, LogEntry, ScanResult } from '@/types'
+import type { WorldState, LogEntry, ScanResult, ShapeObject } from '@/types'
 
 type Phase = 'idle' | 'scanning' | 'interpreting' | 'generating' | 'done'
 type EvolveMode = 'manual' | 'auto'
@@ -24,6 +24,104 @@ const intentLabel: Record<string, string> = {
   modify: '修正 — 调整方向',
   initial: '初次介入',
   none: '静观 — 保持此刻',
+}
+
+// Position Chinese name map
+const positionMap: Record<string, string> = {
+  'top-left': '左上角',
+  'top-center': '上方',
+  'top-right': '右上角',
+  'center-left': '左侧',
+  'center': '中央',
+  'center-right': '右侧',
+  'bottom-left': '左下角',
+  'bottom-center': '下方',
+  'bottom-right': '右下角',
+}
+
+// Size adjective map
+const sizeMap: Record<string, string> = {
+  large: '大的',
+  medium: '',
+  small: '小的',
+}
+
+// Shape noun map (Chinese)
+const shapeNameMap: Record<string, string> = {
+  circle: '圆形',
+  triangle: '三角形',
+  arc: '弧形',
+  crescent: '弯月形',
+  rectangle: '矩形',
+  line: '线条',
+  dot: '点',
+  dots: '点',
+  square: '方形',
+  hexagon: '六边形',
+  cluster: '聚集的形状',
+}
+
+function formatShapesAsNarrative(shapes: ShapeObject[]): string {
+  if (shapes.length === 0) return '我还没看清你放了什么。'
+
+  // Group shapes: separate small scattered elements from notable ones
+  const smallDots: ShapeObject[] = []
+  const notable: ShapeObject[] = []
+
+  for (const s of shapes) {
+    const isSmallDot = (s.type === 'dot' || s.type === 'dots') && s.size === 'small'
+    if (isSmallDot) {
+      smallDots.push(s)
+    } else {
+      notable.push(s)
+  }
+  }
+
+  const parts: string[] = []
+
+  // Describe notable shapes individually
+  for (const s of notable) {
+    const name = shapeNameMap[s.type] || s.type
+    const sizeAdj = sizeMap[s.size] || ''
+    const posName = positionMap[s.position] || s.position
+
+    // Build phrase: "一个靠近{位置}的{大小}{形状}"
+    let phrase: string
+    if (s.position === 'center') {
+      phrase = `一个${sizeAdj ? sizeAdj + '、' : ''}靠近中央的${name}`
+    } else {
+      phrase = `一个${sizeAdj ? sizeAdj + '、' : ''}位于${posName}的${name}`
+    }
+    parts.push(phrase)
+  }
+
+  // Group small dots into one phrase
+  if (smallDots.length > 0) {
+    const positions = smallDots.map((d) => positionMap[d.position] || d.position)
+    const uniquePositions = [...new Set(positions)]
+
+    if (smallDots.length >= 3) {
+      if (uniquePositions.length === 1) {
+        parts.push(`${uniquePositions[0]}有一些零散的小点`)
+      } else {
+        parts.push('还有一些零散的小点散布在各处')
+      }
+    } else if (smallDots.length === 2) {
+      if (uniquePositions.length === 1) {
+        parts.push(`${uniquePositions[0]}有两个小点`)
+      } else {
+        parts.push(uniquePositions.join('和') + '各有一个小点')
+      }
+    } else {
+      const pos = positions[0]
+      parts.push(`${pos}有一个小点`)
+    }
+  }
+
+  // Join with natural Chinese connectors
+  if (parts.length === 1) return parts[0]
+  if (parts.length === 2) return `${parts[0]}，${parts[1]}`
+  return `${parts.slice(0, -1).join('，')}，${parts[parts.length - 1]}`
 }
 
 export default function IntervenorApp() {
@@ -130,7 +228,7 @@ export default function IntervenorApp() {
     const scan: ScanResult = await scanRes.json()
     console.log('[Pipeline] ← /api/scan response:', scan)
     setLastScan(scan)
-    setStatusMsg(`识别完成：${scan.shapes.join('、') || '未识别到形状'}`)
+    setStatusMsg(`识别完成：${formatShapesAsNarrative(scan.shapes)}`)
 
     setPhase('interpreting')
     setStatusMsg('正在解读……')
@@ -499,7 +597,7 @@ export default function IntervenorApp() {
           {lastScan && !isBusy && (
             <div className="scan-meta">
               <span className="scan-intent">{intentLabel[lastScan.userIntent]}</span>
-              <span className="scan-shapes">{lastScan.shapes.join(' · ')}</span>
+              <span className="scan-shapes">{formatShapesAsNarrative(lastScan.shapes)}</span>
               {lastScan.changeDescription && (
                 <p className="scan-change-desc">{lastScan.changeDescription}</p>
               )}

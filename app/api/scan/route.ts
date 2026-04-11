@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { getLastScan, setLastScan } from '@/lib/store'
-import type { ScanResult } from '@/types'
+import type { ScanResult, ShapeObject } from '@/types'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -78,6 +78,10 @@ Rules:
     const currentCount: number = raw.shapeCount ?? (raw.shapes?.length ?? 0)
     const lastCount = lastScan ? lastScan.shapes.length : 0
 
+    // Extract shape type names for comparison
+    const currentShapeNames: string[] = (raw.shapes as { type: string }[])?.map((s) => s.type) ?? []
+    const lastShapeNames: string[] = lastScan?.shapes.map((s) => s.type) ?? []
+
     let changeFromLast: ScanResult['changeFromLast'] = 'none'
     let userIntent: ScanResult['userIntent'] = 'initial'
     let changeDescription = ''
@@ -90,10 +94,10 @@ Rules:
       // Generate detailed change description using GPT-4o
       const changeAnalysisPrompt = `你是一个观察积木变化的AI。
 
-上次扫描：${lastScan!.shapes.join('、')}
+上次扫描：${lastShapeNames.join('、')}
 空间关系：${lastScan!.spatialRelationships}
 
-这次扫描：${(raw.shapes as string[]).join('、')}
+这次扫描：${currentShapeNames.join('、')}
 空间关系：${raw.spatialRelationships}
 
 请用一句中文描述用户对积木做了什么具体改变，以及这可能暗示了什么意图。
@@ -120,18 +124,16 @@ Rules:
         changeFromLast = 'removed'
         userIntent = 'reject'
       } else {
-        const currentShapes = (raw.shapes as string[]) ?? []
-        const lastShapes = lastScan!.shapes
         const sameShapes =
-          currentShapes.length === lastShapes.length &&
-          currentShapes.every((s, i) => s === lastShapes[i])
+          currentShapeNames.length === lastShapeNames.length &&
+          currentShapeNames.every((s, i) => s === lastShapeNames[i])
         changeFromLast = sameShapes ? 'none' : 'moved'
         userIntent = sameShapes ? 'agree' : 'modify'
       }
     }
 
     const result: ScanResult = {
-      shapes: (raw.shapes as string[]) ?? [],
+      shapes: (raw.shapes as ShapeObject[]) ?? [],
       spatialRelationships: raw.spatialRelationships ?? '',
       spatialDetail: raw.spatialDetail ?? '',
       changeFromLast,
