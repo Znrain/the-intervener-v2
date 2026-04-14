@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { WorldState, LogEntry, ScanResult, ShapeObject } from '@/types'
+import ThreeBackground from './ThreeBackground'
 
 type Phase = 'idle' | 'scanning' | 'interpreting' | 'generating' | 'done'
 type EvolveMode = 'manual' | 'auto'
@@ -147,6 +148,10 @@ export default function IntervenorApp() {
   const [evolveInterval, setEvolveInterval] = useState(5) // minutes
   const evolveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Typewriter effect state
+  const [displayedText, setDisplayedText] = useState('')
+  const typewriterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     fetch('/api/world')
       .then((r) => r.json())
@@ -187,12 +192,14 @@ export default function IntervenorApp() {
     }
   }, [cameraOpening, cameraReady])
 
-  // Connect stream to video element once it mounts
+  // Connect stream to video element — also depends on worldStates.length so it re-runs
+  // when the first world is created (video moves from main area to PIP) and the new
+  // element gets srcObject set.
   useEffect(() => {
     if (cameraReady && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current
     }
-  }, [cameraReady])
+  }, [cameraReady, worldData.worldStates.length])
 
   useEffect(() => {
     return () => {
@@ -435,14 +442,56 @@ export default function IntervenorApp() {
   const isBrowsingHistory =
     selectedWorldStateId !== null && selectedWorldStateId !== latestWorldState?.id
 
+  // Typewriter effect for world echo text
+  useEffect(() => {
+    const targetText = currentWorld?.interpretation || ''
+
+    // Clear any existing timer
+    if (typewriterTimerRef.current) {
+      clearTimeout(typewriterTimerRef.current)
+      typewriterTimerRef.current = null
+    }
+
+    // If no text, clear immediately
+    if (!targetText) {
+      setDisplayedText('')
+      return
+    }
+
+    // Always start fresh for new interpretation
+    setDisplayedText('')
+    const startTyping = () => {
+      let index = 0
+      const type = () => {
+        if (index < targetText.length) {
+          setDisplayedText(targetText.slice(0, index + 1))
+          index++
+          typewriterTimerRef.current = setTimeout(type, 80)
+        }
+      }
+      type()
+    }
+    // Small delay so fade-out is visible before new text appears
+    typewriterTimerRef.current = setTimeout(startTyping, 200)
+
+    return () => {
+      if (typewriterTimerRef.current) {
+        clearTimeout(typewriterTimerRef.current)
+        typewriterTimerRef.current = null
+      }
+    }
+  }, [currentWorld?.interpretation])
+
   const handleSelectWorldState = useCallback((worldStateId: string) => {
-    if (worldStateId === latestWorldState?.id) {
+    // Derive latestId inline to avoid stale closure / unstable dependency
+    const latestId = worldData.worldStates[worldData.worldStates.length - 1]?.id
+    if (worldStateId === latestId) {
       setSelectedWorldStateId(null)
       return
     }
 
     setSelectedWorldStateId(worldStateId)
-  }, [latestWorldState?.id])
+  }, [worldData.worldStates.length])
 
   const handleReturnToCurrentWorld = useCallback(() => {
     setSelectedWorldStateId(null)
@@ -450,251 +499,231 @@ export default function IntervenorApp() {
 
   const isBusy = phase === 'scanning' || phase === 'interpreting' || phase === 'generating'
 
-  return (
-    <div className="intervener-layout">
-      {/* LEFT AREA — "Desk Surface": world image + camera + controls */}
-      <div className="left-panel">
-
-        {/* ① World image — the main generated frame */}
-        <div className="world-image-area">
-          {currentWorld ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={currentWorld.imageUrl} alt="世界画面" className="world-img" />
-          ) : (
-            <div className="world-placeholder">
-              <span className="placeholder-text">世界尚未诞生</span>
-              <span className="placeholder-sub">摆下积木，开始介入</span>
-            </div>
-          )}
-
-          {currentWorld && (
-            <div className="world-caption">
-              <span className="caption-text">{currentWorld.interpretation}</span>
-              <div className="caption-badges">
-                {isBrowsingHistory && (
-                  <button onClick={handleReturnToCurrentWorld} className="caption-badge badge-history" title="返回当前世界">
-                    历史快照
-                  </button>
-                )}
-                <span className={`caption-badge ${currentWorld.triggeredBy === 'user' ? 'badge-user' : 'badge-ai'}`}>
-                  {currentWorld.triggeredBy === 'user' ? '用户介入' : 'AI自主'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ② Camera PIP — floating camera/upload preview */}
-          <div className="camera-float">
-            {!cameraReady && !cameraOpening && !cameraError && (
-              <button onClick={openCamera} className="camera-toggle-btn" title="打开摄像头">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 7l-7 5 7 5V7z"/>
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                </svg>
-              </button>
-            )}
-            {cameraOpening && <div className="camera-float-error">正在打开摄像头…</div>}
-            {cameraError ? (
-              <div className="camera-float-error">{cameraError}</div>
-            ) : cameraReady ? (
-              <>
-                <video ref={videoRef} autoPlay playsInline muted className="camera-float-video" />
-                <button onClick={closeCamera} className="camera-close-btn" title="关闭摄像头">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </>
-            ) : null}
-            {uploadedPreview && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={uploadedPreview} alt="上传的图片" className="camera-float-upload" />
-            )}
-          </div>
-
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-
-        {/* ③ Controls — scan, upload, evolve */}
-        <div className="controls-bar">
-          <div className="controls-row">
-            <button onClick={handleScan} disabled={isBusy || !cameraReady} className="scan-btn">
-              {isBusy ? '处理中…' : '扫描'}
-            </button>
-            <button onClick={handleUploadClick} disabled={isBusy} className="upload-btn">
-              上传图片
-            </button>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
+  // Build evolve particles — 16 slow drifting specks
+  const evolveParticles =
+    evolveMode === 'auto'
+      ? Array.from({ length: 16 }, (_, i) => {
+          const side = i % 4 // 0=bottom 1=right 2=top 3=left
+          const progress = (i / 16) // spread evenly
+          let style: React.CSSProperties
+          if (side === 0) {
+            // bottom edge, drifting upward
+            style = {
+              left: `${10 + progress * 80}%`,
+              bottom: '10px',
+              '--drift-x': `${(i % 2 === 0 ? 1 : -1) * (6 + (i % 5) * 3)}px`,
+            } as React.CSSProperties
+          } else if (side === 1) {
+            // right edge, drifting left
+            style = {
+              right: '10px',
+              top: `${15 + progress * 70}%`,
+              '--drift-x': `${-(6 + (i % 5) * 3)}px`,
+            } as React.CSSProperties
+          } else if (side === 2) {
+            // top edge, drifting down (rare, most start from sides)
+            style = {
+              left: `${15 + progress * 70}%`,
+              top: '10px',
+              '--drift-x': `${(i % 2 === 0 ? 1 : -1) * (4 + (i % 4) * 2)}px`,
+            } as React.CSSProperties
+          } else {
+            // left edge, drifting right
+            style = {
+              left: '10px',
+              top: `${20 + progress * 60}%`,
+              '--drift-x': `${6 + (i % 5) * 3}px`,
+            } as React.CSSProperties
+          }
+          const size = 2 + (i % 3)
+          const hue = 195 + (i % 3) * 6 // cool blue-silver
+          const dur = 4 + (i % 4) * 1.5
+          const delay = -(i * 0.65) // stagger so they don't all start together
+          return (
+            <span
+              key={i}
+              className="evolve-particle"
+              style={{
+                ...style,
+                width: `${size}px`,
+                height: `${size}px`,
+                background: `hsla(${hue}, 40%, 78%, 0.55)`,
+                boxShadow: `0 0 ${size * 2}px hsla(${hue}, 40%, 78%, 0.35)`,
+                animationDuration: `${dur}s`,
+                animationDelay: `${delay}s`,
+              }}
             />
-            <button onClick={handleRestart} disabled={isBusy} className="restart-btn" title="重新开始">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                <path d="M3 3v5h5"/>
+          )
+        })
+      : null
+
+  return (
+    <div className="world-root">
+      {/* Three.js 3D background scene */}
+      <ThreeBackground />
+
+      {/* Background with 3D depth gradients */}
+      <div className="world-bg" />
+
+      {/* Evolve ambient particles — visible only in auto mode */}
+      {evolveParticles && (
+        <div className="evolve-particles">{evolveParticles}</div>
+      )}
+
+      {/* Left panel — World logs */}
+      <div className="logs-panel">
+        {worldData.logs.length === 0 ? (
+          <div className="log-card">
+            <p className="log-content" style={{ color: 'var(--text-ghost)', fontStyle: 'italic' }}>
+              世界尚未留下记忆
+            </p>
+          </div>
+        ) : (
+          [...worldData.logs].reverse().map((log) => (
+            <div
+              key={log.id}
+              className={`log-card log-card-${log.triggeredBy}`}
+              onClick={() => handleSelectWorldState(log.worldStateId)}
+            >
+              <div className="log-time">{formatTime(log.timestamp)}</div>
+              <p className="log-content">{log.content}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Right panel — Causal timeline */}
+      <div className="timeline-panel">
+        {worldData.worldStates.length === 0 ? (
+          <div className="timeline-card">
+            <p style={{ color: 'var(--text-ghost)', fontSize: '12px', textAlign: 'center', fontStyle: 'italic' }}>
+              暂无历史
+            </p>
+          </div>
+        ) : (
+          [...worldData.worldStates].reverse().map((ws, i) => (
+            <div
+              key={ws.id}
+              className="timeline-card"
+              onClick={() => handleSelectWorldState(ws.id)}
+            >
+              {i > 0 && <div className="timeline-connector" />}
+              <div className={`timeline-dot timeline-dot-${ws.triggeredBy}`} />
+              <div className="timeline-time">{formatTime(ws.timestamp)}</div>
+              <p className="timeline-interp">{ws.interpretation}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Center column — Camera, world image, echo, status */}
+      <div className="world-center">
+        {/* Camera pip — above world image, centered */}
+        <div className="camera-pip">
+          {!cameraReady && !cameraOpening && !cameraError && (
+            <button onClick={openCamera} className="camera-toggle-btn" title="打开摄像头">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 7l-7 5 7 5V7z"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
               </svg>
             </button>
-          </div>
-
-          {/* Evolution mode controls */}
-          <div className="evolve-controls">
-            <div className="evolve-mode-row">
-              <button
-                onClick={handleEvolveManual}
-                disabled={isBusy}
-                className="evolve-once-btn"
-                title="让世界演化一次"
-              >
-                演化一次
-              </button>
-              <div className="evolve-mode-toggle">
-                <button
-                  onClick={handleToggleMode}
-                  className={`mode-pill ${evolveMode === 'manual' ? 'mode-pill-active' : ''}`}
-                >
-                  静观
-                </button>
-                <button
-                  onClick={handleToggleMode}
-                  className={`mode-pill ${evolveMode === 'auto' ? 'mode-pill-active' : ''}`}
-                >
-                  自生
-                </button>
-              </div>
-              {evolveMode === 'auto' && (
-                <div className="evolve-interval-control">
-                  <span className="interval-label">每</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={evolveInterval}
-                    onChange={(e) => handleIntervalChange(Number(e.target.value))}
-                    className="interval-input"
-                  />
-                  <span className="interval-label">分钟</span>
-                </div>
-              )}
-            </div>
-            <div className="evolve-status">
-              {evolveMode === 'auto'
-                ? `世界在自行生长 · 每 ${evolveInterval} 分钟一次`
-                : '世界等待你的介入'}
-            </div>
-          </div>
-
-          {statusMsg && (
-            <div className="status-bar">
-              {isBusy && <span className="status-dot" />}
-              <span>{statusMsg}</span>
-            </div>
           )}
-
-          {lastScan && !isBusy && (
-            <div className="scan-meta">
-              <span className="scan-intent">{intentLabel[lastScan.userIntent]}</span>
-              <span className="scan-shapes">{formatShapesAsNarrative(lastScan.shapes)}</span>
-              {lastScan.changeDescription && (
-                <p className="scan-change-desc">{lastScan.changeDescription}</p>
-              )}
-            </div>
-          )}
-
-          {/* Debug: captured image preview */}
-          {capturedPreview && (
-            <div className="debug-capture-preview">
-              <div className="debug-capture-label">拍摄快照</div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={capturedPreview} alt="captured frame" className="debug-capture-img" />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* RIGHT AREA — "Observation Notebook": echo + logs + timeline */}
-      <div className="right-panel">
-        {/* ④ World echo + logs */}
-        <div className="interp-section">
-          <h2 className="section-title">世界的回声</h2>
-          {currentWorld ? (
+          {cameraOpening && <div className="camera-pip-msg">连接中…</div>}
+          {cameraError ? (
+            <div className="camera-pip-msg">{cameraError}</div>
+          ) : cameraReady ? (
             <>
-              <div className="interp-meta">
-                <span className="interp-time">{formatTime(currentWorld.timestamp)}</span>
-                <span className={`interp-source ${currentWorld.triggeredBy === 'user' ? 'badge-user' : 'badge-ai'}`}>
-                  {currentWorld.triggeredBy === 'user' ? '用户介入' : 'AI自主'}
-                </span>
-                {isBrowsingHistory && (
-                  <button onClick={handleReturnToCurrentWorld} className="return-current-btn">
-                    回到当前世界
-                  </button>
-                )}
-              </div>
-              <p className="interp-text">{currentWorld.interpretation}</p>
-              {isBrowsingHistory && <p className="interp-note">这是一段仍被保存的世界记忆。此刻的世界仍在继续生长。</p>}
+              <video ref={videoRef} autoPlay playsInline muted className="camera-pip-video" />
             </>
-          ) : latestInterpretation ? (
-            <p className="interp-text">{latestInterpretation}</p>
-          ) : (
-            <p className="interp-empty">等待第一次介入……</p>
+          ) : null}
+          {uploadedPreview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={uploadedPreview} alt="上传的图片" className="camera-pip-upload" />
           )}
         </div>
 
-        <div className="logs-section">
-          <h2 className="section-title">世界日志</h2>
-          <div className="logs-scroll">
-            {worldData.logs.length === 0 ? (
-              <p className="logs-empty">世界尚未留下记忆。</p>
-            ) : (
-              [...worldData.logs].reverse().map((log) => (
-                <div
-                  key={log.id}
-                  className={`log-entry ${log.worldStateId === currentWorld?.id ? 'log-entry-active' : ''}`}
-                  onClick={() => handleSelectWorldState(log.worldStateId)}
-                >
-                  <div className="log-meta">
-                    <span className={`log-badge ${log.triggeredBy === 'user' ? 'badge-user' : 'badge-ai'}`}>
-                      {log.triggeredBy === 'user' ? '用户介入' : 'AI自主'}
-                    </span>
-                    <span className="log-time">{formatTime(log.timestamp)}</span>
-                  </div>
-                  <p className="log-content">{log.content}</p>
-                </div>
-              ))
-            )}
+        {/* World image with radial mask fade */}
+        {currentWorld ? (
+          <div className="world-image-wrap">
+            <div className="world-glow-layer" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={currentWorld.imageUrl} alt="世界画面" className="world-img" />
+            <div className="world-img-mask" />
           </div>
+        ) : (
+          <div className="world-void">
+            <p className="void-text">{isBusy ? (statusMsg || '处理中…') : '世界尚未诞生'}</p>
+            {!isBusy && <p className="void-sub">摆下积木，开始介入</p>}
+          </div>
+        )}
+
+        {/* World echo — typewriter text */}
+        <div className="world-echo">
+          {displayedText && (
+            <span className="echo-text">{displayedText}</span>
+          )}
         </div>
 
-        {/* ⑤ Causal timeline */}
-        <div className="timeline-section">
-          <h2 className="section-title">因果时间线</h2>
-          <div className="timeline-scroll">
-            {worldData.worldStates.length === 0 ? (
-              <p className="timeline-empty">暂无历史。</p>
-            ) : (
-              [...worldData.worldStates].reverse().map((ws) => (
-                <div
-                  key={ws.id}
-                  className={`timeline-item ${ws.id === currentWorld?.id ? 'timeline-item-active' : ''}`}
-                  onClick={() => handleSelectWorldState(ws.id)}
-                >
-                  <div className={`timeline-dot ${ws.triggeredBy === 'user' ? 'dot-user' : 'dot-ai'}`} />
-                  <div className="timeline-body">
-                    <span className={`timeline-badge ${ws.triggeredBy === 'user' ? 'badge-user' : 'badge-ai'}`}>
-                      {ws.triggeredBy === 'user' ? '用户介入' : 'AI自主演化'}
-                    </span>
-                    <span className="timeline-time">{formatTime(ws.timestamp)}</span>
-                    <p className="timeline-interp">{ws.interpretation}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+        {/* Status */}
+        <div className="world-status">
+          {statusMsg || (evolveMode === 'auto' ? '世界在自行生长' : '世界等待你的介入')}
         </div>
       </div>
+
+      {/* Bottom controls bar */}
+      <div className="controls-bar">
+        <div className="controls-row">
+          <button onClick={handleScan} disabled={isBusy || !cameraReady} className={`scan-btn${phase === 'scanning' ? ' scan-btn-ripple' : ''}`}>
+            {isBusy ? '处理中…' : '扫描'}
+          </button>
+          <button onClick={handleUploadClick} disabled={isBusy} className="upload-btn">
+            上传图片
+          </button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button onClick={handleRestart} disabled={isBusy} className="restart-btn" title="重新开始">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="evolve-controls">
+          <button onClick={handleEvolveManual} disabled={isBusy} className="evolve-once-btn">
+            演化一次
+          </button>
+          <div className="evolve-mode-toggle">
+            <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'manual' ? 'mode-pill-active' : ''}`}>
+              静观
+            </button>
+            <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'auto' ? 'mode-pill-active' : ''}`}>
+              自生
+            </button>
+          </div>
+          {evolveMode === 'auto' && (
+            <div className="evolve-interval-control">
+              <span className="interval-label">每</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={evolveInterval}
+                onChange={(e) => handleIntervalChange(Number(e.target.value))}
+                className="interval-input"
+              />
+              <span className="interval-label">分钟</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   )
 }

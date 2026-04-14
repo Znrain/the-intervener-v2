@@ -1,60 +1,86 @@
 @AGENTS.md
-# The Intervener / 介入者
+# The Intervener v2 / 介入者·重构版
 
 ## 项目概述
-这是一个清华美术学院硕士毕业设计项目。一个由物理积木驱动、能够自主演化的AI生成世界系统。用户不需要写任何文字，只需要在桌上摆放形状，就能持续影响一个正在生长的AI世界。
+清华美术学院硕士毕业设计项目。在v1基础上进行完整的视觉与体验重设计。
+核心交互机制不变，重构目标是将系统从功能性工具升级为一个有完整叙事弧线的沉浸式设计作品。
 
-## 核心交互机制：三步介入循环
+## 本版本新增的三个体验节点
+
+### 节点一：入口页（新增）
+路由：/enter 或 / （主页重定向）
+- 全屏黑色/极深底色
+- 中央显示当前世界状态图（若无世界则显示星云粒子动效）
+- 一行文字：「这个世界正在等待你的介入」
+- 触发点：一个光晕圆圈，用户点击/触碰后以fade+缩放过渡进入主界面
+- 过渡动效：光晕扩散至全屏，dissolve进入主界面
+
+### 节点二：主界面重设计（重构现有界面）
+路由：/world
+视觉方向：光遇（Sky）+ 2.5D层次感 + 古风典籍
+具体要求：
+- 背景：极深色（#0a0a0f），不是米白色
+- 世界画面：不是方块图，是漂浮在空间中的发光平面，四周有光晕渐变边缘
+- 时间线和日志：半透明悬浮卡片，毛玻璃效果，字体用暖金色或冷银色发光
+- 扫描触发：点击扫描区域时有光波向外扩散涟漪动效
+- AI自主演化时：画面边缘有缓慢流动的光粒子，提示世界在自主呼吸
+- 摄像头预览：小窗，圆角，半透明边框，不显眼但始终可见
+- 整体感：安静、克制、有重量感，不是游戏热闹感
+
+### 节点三：收尾日志页（新增）
+路由：/journal
+触发：用户在主界面点击「结束本次介入」或会话超时后可进入
+- 样式：全屏古籍/典籍风格，深色纸张质感背景
+- 内容：按时间顺序翻页，每页一个时间节点
+  - 用户介入页：显示当时的积木扫描图 + AI解读句 + 生成画面缩略图
+  - AI演化页：显示演化前后画面对比 + 世界日志原文
+- 翻页动效：慢速，带纸张纹理的page-turn效果
+- 最后一页：完整世界线全貌，用户介入点（暖色）和AI演化点（冷色）交替排列在时间轴上
+- 可导出/截图分享
+
+## 核心交互机制（与v1完全相同，不改动）
 
 ### Step 1 — 物理扫描
 用户把积木摆在桌上，网页摄像头拍照。
-GPT-4o Vision识别：形状种类、数量、空间关系（哪个靠近哪个、朝向、聚散、大小对比）。
-用户不需要知道积木代表什么，模糊性被完整保留。
+GPT-4o Vision识别：形状种类、数量、空间关系。
+模糊性被完整保留。
 
 ### Step 2 — AI语义化解读
-GPT-4o不直接生成图像，先输出一句诗意的话说出它理解到了什么。
-例如："我看到了一片被遗忘的海岸，有什么东西正在靠近。"
+GPT-4o先输出一句诗意的话说出它理解到了什么。
 同时显示自上次介入以来世界发生了什么变化。
 
 ### Step 3 — 物理表态（通过第二次扫描判断）
-用户动完积木后再次拍照，系统对比两次扫描的差异：
-- 积木数量增加 → 用户同意，继续这个方向
-- 积木数量减少 → 用户拒绝，换个方向
-- 数量不变但位置/朝向变了 → 用户修正
-没有任何按钮，所有交互都是物理的。
+对比两次扫描差异：
+- 积木数量增加 → 同意，继续这个方向
+- 积木数量减少 → 拒绝，换个方向
+- 数量不变但位置/朝向变了 → 修正
 
-## 世界自主演化
-用户不在时，系统每隔一段时间自动推进世界一步。
-用户回来时看到世界已经变化，并能看到变化的原因。
+## 世界自主演化（与v1相同）
+用户不在时系统自动推进世界。
+用户回来时看到变化并能看到变化原因。
 
-## 三个核心数据结构
+## 数据结构（与v1相同）
 
-### WorldState（世界状态）
 ```typescript
 interface WorldState {
   id: string
-  imageUrl: string        // DALL-E生成的世界画面
-  interpretation: string  // GPT-4o的诗意解读
+  imageUrl: string
+  interpretation: string
   timestamp: number
-  triggeredBy: 'user' | 'ai'  // 因果可见性：谁触发了这次变化
+  triggeredBy: 'user' | 'ai'
+  scanImageUrl?: string  // 新增：保存当次扫描图，供日志页使用
 }
-```
 
-### ScanResult（扫描结果）
-```typescript
 interface ScanResult {
-  shapes: string[]           // 识别到的形状列表
-  spatialRelationships: string  // 空间关系描述
-  changeFromLast: 'added' | 'removed' | 'moved' | 'none'  // 与上次的差异
-  userIntent: 'agree' | 'reject' | 'modify' | 'initial'   // 推断的用户意图
+  shapes: string[]
+  spatialRelationships: string
+  changeFromLast: 'added' | 'removed' | 'moved' | 'none'
+  userIntent: 'agree' | 'reject' | 'modify' | 'initial'
 }
-```
 
-### LogEntry（世界日志）
-```typescript
 interface LogEntry {
   id: string
-  content: string           // AI第一人称日记内容
+  content: string
   timestamp: number
   triggeredBy: 'user' | 'ai'
   worldStateId: string
@@ -65,45 +91,51 @@ interface LogEntry {
 - Next.js 15 (App Router)
 - TypeScript
 - Tailwind CSS
+- Framer Motion（动效，新增）
 - OpenAI API (GPT-4o Vision + GPT-4o + DALL-E 3)
-- 数据存储：先用内存/JSON文件，后期可换数据库
+- 数据存储：内存/JSON文件
 
-## API Routes需要实现
-- POST /api/scan — 接收图片，调用GPT-4o Vision识别，对比上次扫描，推断用户意图
-- POST /api/interpret — 根据扫描结果调用GPT-4o生成诗意解读
-- POST /api/generate — 调用DALL-E 3生成世界画面
-- POST /api/evolve — AI自主推进世界（定时触发）
-- GET /api/world — 获取当前世界状态
-- GET /api/logs — 获取世界日志
+## 路由结构
+- / → 重定向到 /enter
+- /enter → 入口页
+- /world → 主界面（原有功能完整保留，视觉重构）
+- /journal → 收尾日志页
 
-## 视觉风格
-光遇（Sky: Children of the Light）风格：
-- 2D分层，有景深感（前景/中景/背景分层）
-- 暗色调为主，有光晕效果
-- 磨砂质感，柔和光线
-- 版画感，非照片写实
-DALL-E 3 prompt风格关键词：
-"2D layered illustration, Sky game art style, dark atmospheric, soft glowing light, matte texture, painterly, silhouette layers, mystical fog, warm light accents, no text"
+## API Routes（与v1相同，无需改动）
+- POST /api/scan
+- POST /api/interpret
+- POST /api/generate
+- POST /api/evolve
+- GET /api/world
+- GET /api/logs
 
-## 界面布局（网页端，非手机端）
-三个区域：
-1. 主视觉区：当前世界画面（占页面主体）
-2. 世界日志区：AI第一人称日记，可滚动
-3. 因果时间线：每次世界变化标注来源（用户介入 or AI自主演化）
+## 视觉设计规范
 
-## 摄像头功能
-使用浏览器原生 getUserMedia API
-网页上有一个摄像头预览窗口
-用户点击"扫描"按钮触发拍照（注意：这个按钮只是触发拍照动作，不是用户表态，表态完全通过物理积木变化判断）
+### 色彩系统
+- 主背景：#0a0a0f（极深蓝黑）
+- 次级背景：#12121a
+- 世界画面光晕：rgba(255, 200, 120, 0.15) 暖金
+- AI演化指示光：rgba(120, 160, 255, 0.2) 冷蓝
+- 用户介入指示光：rgba(255, 180, 80, 0.3) 暖橙
+- 文字主色：#e8dcc8（暖米白）
+- 时间线暖色节点：#d4a853
+- 时间线冷色节点：#7ab3d4
+- 毛玻璃卡片：backdrop-blur-md, bg-white/5
 
-## 当前进度
-项目刚初始化，从零开始构建。
-优先跑通核心流程：拍照→Vision识别→诗意解读→生成画面→显示结果。
-然后加入：对比扫描→推断用户意图→更新世界→写日志→因果时间线。
-最后加入：定时自主演化。
+### 字体
+- 中文：系统默认或Noto Serif SC（典籍感）
+- 数字/时间：等宽字体
+- 诗意解读句：较大字号，字间距略宽
 
-## 重要设计原则
-1. 没有文字输入框，用户不需要打任何字
+### 动效原则
+- 所有过渡：easeInOut，不用弹簧动效
+- 光晕扩散：0.8s-1.2s
+- 页面切换：0.6s fade
+- 翻页：1.0s，带轻微透视变形
+- 粒子：极慢，5-10s一个循环
+
+## 重要设计原则（与v1相同）
+1. 没有文字输入框
 2. 没有选择按钮用于表态，所有意图通过积木变化判断
-3. 因果可见性是核心：每次世界变化必须标注是用户触发还是AI自主
-4. 世界状态要持久化，用户离开再回来世界还在
+3. 因果可见性是核心
+4. 世界状态要持久化
