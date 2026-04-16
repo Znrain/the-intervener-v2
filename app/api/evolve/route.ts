@@ -1,3 +1,5 @@
+'use server'
+
 import OpenAI from 'openai'
 import sharp from 'sharp'
 import { getLatestWorldState, addWorldState, addLog } from '@/lib/store'

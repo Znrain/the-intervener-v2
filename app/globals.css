@@ -35,13 +35,15 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   World root — Full-screen immersive container
+   World root — Full-screen immersive container with perspective
    ═══════════════════════════════════════════════════════════════════════ */
 .world-root {
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: var(--bg-void);
+  perspective: 2000px;
+  perspective-origin: 50% 50%;
 }
 
 /* Multi-layer radial gradients for 3D depth */
@@ -52,7 +54,8 @@ html, body {
     radial-gradient(ellipse at 50% 45%, rgba(40, 30, 80, 0.4) 0%, transparent 55%),
     radial-gradient(ellipse at 50% 50%, rgba(20, 15, 40, 0.3) 0%, transparent 70%),
     radial-gradient(ellipse at 50% 50%, var(--bg-void) 60%, #000000 100%);
-  z-index: 0;
+  z-index: -2;
+  pointer-events: none;
 }
 
 /* Subtle noise texture overlay */
@@ -72,7 +75,7 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translateZ(200px) scale(0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -96,6 +99,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
+  margin-top: -24px;
 }
 
 .camera-pip-video {
@@ -224,14 +228,95 @@ html, body {
   letter-spacing: 0.12em;
 }
 
+/* 自主模式状态 — 世界在自行生长 + 间隔调整 */
+.auto-mode-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 11px;
+  color: rgba(212, 168, 83, 0.5);
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 12px rgba(212, 168, 83, 0.3);
+}
+
+/* 等待介入提示 — 摄像头框上方 */
+.wait-prompt {
+  text-align: center;
+  font-size: 11px;
+  color: rgba(212, 168, 83, 0.5);
+  letter-spacing: 0.18em;
+  padding: 6px 0 10px;
+  text-shadow: 0 0 12px rgba(212, 168, 83, 0.3);
+}
+
+/* 扫描结果展示区 */
+.scan-info-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.scan-shapes-label {
+  font-size: 11px;
+  color: rgba(212, 168, 83, 0.7);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.scan-spatial-note {
+  font-size: 10px;
+  color: rgba(232, 220, 200, 0.35);
+  letter-spacing: 0.04em;
+  text-align: center;
+  font-style: italic;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-intent {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.scan-intent-initial {
+  color: rgba(212, 168, 83, 0.8);
+  background: rgba(212, 168, 83, 0.08);
+  border: 1px solid rgba(212, 168, 83, 0.2);
+}
+
+.scan-intent-agree {
+  color: #7ab3d4;
+  background: rgba(122, 179, 212, 0.08);
+  border: 1px solid rgba(122, 179, 212, 0.2);
+}
+
+.scan-intent-reject {
+  color: #d47a7a;
+  background: rgba(212, 122, 122, 0.08);
+  border: 1px solid rgba(212, 122, 122, 0.2);
+}
+
+.scan-intent-modify {
+  color: #c8a84b;
+  background: rgba(200, 168, 75, 0.08);
+  border: 1px solid rgba(200, 168, 75, 0.2);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
-   Left panel — World logs (frosted glass cards)
+   Left panel — World logs (frosted glass cards with perspective)
    ═══════════════════════════════════════════════════════════════════════ */
 .logs-panel {
   position: fixed;
   left: 24px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateZ(-200px) rotateY(15deg);
+  transform-origin: right center;
   width: 280px;
   max-height: 70vh;
   display: flex;
@@ -239,7 +324,7 @@ html, body {
   gap: 12px;
   z-index: 5;
   overflow-y: auto;
-  padding: 8px;
+  padding: 40px 40px 40px 8px;
 }
 
 .logs-panel::-webkit-scrollbar { width: 3px; }
@@ -271,6 +356,19 @@ html, body {
   border-left: 3px solid var(--silver-cool);
 }
 
+/* Left/right panel sync — highlighted card glow */
+.log-card-highlighted {
+  background: rgba(212, 168, 83, 0.12);
+  border-color: rgba(212, 168, 83, 0.4);
+  box-shadow: 0 0 18px rgba(212, 168, 83, 0.25), 0 0 36px rgba(212, 168, 83, 0.12);
+}
+
+.log-card-highlighted.log-card-ai {
+  background: rgba(122, 179, 212, 0.12);
+  border-color: rgba(122, 179, 212, 0.4);
+  box-shadow: 0 0 18px rgba(122, 179, 212, 0.25), 0 0 36px rgba(122, 179, 212, 0.12);
+}
+
 .log-time {
   font-size: 10px;
   color: var(--text-ghost);
@@ -285,13 +383,14 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Right panel — Causal timeline (frosted glass cards)
+   Right panel — Causal timeline (frosted glass cards with perspective)
    ═══════════════════════════════════════════════════════════════════════ */
 .timeline-panel {
   position: fixed;
   right: 24px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateZ(-200px) rotateY(-15deg);
+  transform-origin: right center;
   width: 280px;
   max-height: 70vh;
   display: flex;
@@ -299,7 +398,7 @@ html, body {
   gap: 8px;
   z-index: 5;
   overflow-y: auto;
-  padding: 8px;
+  padding: 40px 40px 40px 8px;
 }
 
 .timeline-panel::-webkit-scrollbar { width: 3px; }
@@ -352,6 +451,13 @@ html, body {
   box-shadow: 0 0 12px var(--silver-glow);
 }
 
+/* Timeline card highlighted glow */
+.timeline-card-highlighted {
+  background: rgba(212, 168, 83, 0.12);
+  border-color: rgba(212, 168, 83, 0.4);
+  box-shadow: 0 0 18px rgba(212, 168, 83, 0.25), 0 0 36px rgba(212, 168, 83, 0.12);
+}
+
 .timeline-time {
   font-size: 10px;
   color: var(--text-ghost);
@@ -379,11 +485,7 @@ html, body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 20px 24px;
-  background: rgba(10, 10, 15, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 16px 24px;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -397,25 +499,24 @@ html, body {
   align-items: center;
 }
 
+/* Scan button — text-only with gold glow */
 .scan-btn {
   position: relative;
-  padding: 12px 32px;
-  background: rgba(212, 168, 83, 0.85);
-  color: #0a0a0f;
+  padding: 0;
+  background: none;
   border: none;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  color: var(--gold-warm);
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0.08em;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: text-shadow 0.25s ease;
   overflow: visible;
 }
 
 .scan-btn:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  text-shadow: 0 0 12px var(--gold-glow), 0 0 24px rgba(212, 168, 83, 0.4);
 }
 
 .scan-btn:disabled {
@@ -423,7 +524,7 @@ html, body {
   cursor: not-allowed;
 }
 
-/* Scan button ripple animation */
+/* Scan button ripple animation — outer ring */
 .scan-btn-ripple::after {
   content: '';
   position: absolute;
@@ -440,23 +541,22 @@ html, body {
   100% { opacity: 0;   transform: scale(1.08); }
 }
 
+/* Upload button — text-only with neutral glow */
 .upload-btn {
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.06);
+  padding: 0;
+  background: none;
+  border: none;
   color: var(--text-dim);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   letter-spacing: 0.06em;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
 }
 
 .upload-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
   color: var(--text-warm);
-  border-color: rgba(255, 255, 255, 0.20);
+  text-shadow: 0 0 10px rgba(232, 220, 200, 0.5);
 }
 
 .upload-btn:disabled {
@@ -464,55 +564,24 @@ html, body {
   cursor: not-allowed;
 }
 
-.restart-btn {
+/* Evolve once button — icon-only, silver glow */
+.evolve-once-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.06);
+  width: auto;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: none;
   color: var(--text-ghost);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
   cursor: pointer;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-}
-
-.restart-btn:hover:not(:disabled) {
-  color: rgba(220, 90, 75, 0.9);
-  border-color: rgba(220, 90, 75, 0.3);
-  background: rgba(220, 90, 75, 0.08);
-}
-
-.restart-btn:disabled {
-  opacity: 0.2;
-  cursor: not-allowed;
-}
-
-/* Evolution controls */
-.evolve-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.evolve-once-btn {
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-ghost);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  letter-spacing: 0.06em;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
 }
 
 .evolve-once-btn:hover:not(:disabled) {
   color: var(--silver-cool);
-  border-color: rgba(122, 179, 212, 0.3);
-  background: rgba(122, 179, 212, 0.08);
+  text-shadow: 0 0 12px var(--silver-glow), 0 0 22px rgba(122, 179, 212, 0.3);
 }
 
 .evolve-once-btn:disabled {
@@ -520,33 +589,42 @@ html, body {
   cursor: not-allowed;
 }
 
+/* Inline mode toggle — text-only, glow hover */
 .evolve-mode-toggle {
   display: flex;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
+  gap: 0;
+  align-items: center;
 }
 
 .mode-pill {
-  padding: 6px 14px;
-  background: transparent;
-  color: var(--text-ghost);
+  padding: 0;
+  background: none;
   border: none;
-  font-size: 11px;
+  color: var(--text-ghost);
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
   letter-spacing: 0.08em;
-  transition: background 0.2s, color 0.2s;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
 }
 
 .mode-pill:hover {
-  color: var(--text-dim);
+  color: var(--text-warm);
+  text-shadow: 0 0 10px rgba(232, 220, 200, 0.5);
 }
 
 .mode-pill-active {
-  background: rgba(212, 168, 83, 0.15);
+  background: none;
   color: var(--gold-warm);
+  text-shadow: 0 0 12px var(--gold-glow), 0 0 24px rgba(212, 168, 83, 0.4);
+}
+
+.mode-separator {
+  font-size: 12px;
+  color: rgba(232, 220, 200, 0.2);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  padding: 0 2px;
 }
 
 .evolve-interval-control {
@@ -561,21 +639,24 @@ html, body {
 }
 
 .interval-input {
-  width: 50px;
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.08);
+  width: 40px;
+  padding: 2px 4px;
+  background: transparent;
   color: var(--text-dim);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  border: none;
+  border-bottom: 1px solid rgba(232, 220, 200, 0.3);
+  border-radius: 0;
   font-size: 11px;
   font-family: inherit;
   text-align: center;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.25s ease, text-shadow 0.25s ease;
 }
 
 .interval-input:focus {
-  border-color: rgba(122, 179, 212, 0.4);
+  border-bottom-color: rgba(212, 168, 83, 0.7);
+  text-shadow: 0 0 8px rgba(212, 168, 83, 0.4);
+  color: var(--text-warm);
 }
 
 .interval-input::-webkit-inner-spin-button,
@@ -737,6 +818,75 @@ html, body {
   pointer-events: none;
   z-index: 120;
   transition: opacity 1.2s ease-in;
+}
+
+/* End intervention button */
+/* Reset button — top-right, icon-only with red glow */
+.reset-fixed {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  color: rgba(232, 220, 200, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.reset-fixed:hover:not(:disabled) {
+  color: rgba(220, 90, 75, 0.9);
+  text-shadow: 0 0 12px rgba(220, 90, 75, 0.8), 0 0 24px rgba(220, 90, 75, 0.4);
+}
+
+.reset-fixed:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* End intervention button — text-only with neutral glow */
+.end-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(232, 220, 200, 0.45);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.end-btn:hover {
+  color: var(--text-warm);
+  text-shadow: 0 0 10px rgba(232, 220, 200, 0.5);
+}
+
+/* Camera toggle button — icon-only with glow */
+.camera-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-ghost);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.camera-toggle-btn:hover {
+  color: var(--text-warm);
+  text-shadow: 0 0 10px rgba(232, 220, 200, 0.6);
 }
 
 /* Utility */

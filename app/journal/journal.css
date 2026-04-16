@@ -1,0 +1,574 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Journal Page — Ancient Book / 航海日志风格
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.journal-root {
+  position: fixed;
+  inset: 0;
+  background: #0d0b08;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 纸张颗粒纹理 */
+.journal-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header */
+.journal-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid rgba(232, 220, 200, 0.08);
+}
+
+.back-to-world {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: rgba(232, 220, 200, 0.5);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.back-to-world:hover {
+  color: #e8dcc8;
+}
+
+.journal-title {
+  font-size: 14px;
+  font-weight: normal;
+  color: #d4a853;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 15px rgba(212, 168, 83, 0.4);
+  margin: 0;
+}
+
+.page-indicator {
+  font-size: 12px;
+  color: rgba(232, 220, 200, 0.4);
+  letter-spacing: 0.1em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Main content area — centered book
+   ═══════════════════════════════════════════════════════════════════════ */
+.journal-main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+  z-index: 5;
+  padding: 32px 32px 0;
+  overflow-y: auto;
+}
+
+.journal-main::-webkit-scrollbar { width: 3px; }
+.journal-main::-webkit-scrollbar-track { background: transparent; }
+.journal-main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   The book container
+   ═══════════════════════════════════════════════════════════════════════ */
+.journal-book {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: 32px;
+}
+
+/* Top/bottom ornamental rules */
+.book-top-rule,
+.book-bottom-rule {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.book-bottom-rule {
+  margin-bottom: 24px;
+  margin-top: 32px;
+}
+
+.rule-left,
+.rule-right {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(212, 168, 83, 0.3) 30%,
+    rgba(212, 168, 83, 0.3) 70%,
+    transparent
+  );
+}
+
+.rule-ornament {
+  font-size: 10px;
+  color: rgba(212, 168, 83, 0.5);
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Timeline spine + entries
+   ═══════════════════════════════════════════════════════════════════════ */
+.timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-spine {
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(212, 168, 83, 0.3),
+    rgba(122, 179, 212, 0.3)
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Flame particles overlay
+   ═══════════════════════════════════════════════════════════════════════ */
+.flame-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.flame-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 160, 40, 0.85) 0%,
+    rgba(255, 80, 20, 0.5) 40%,
+    rgba(255, 40, 0, 0.15) 70%,
+    transparent 100%
+  );
+  filter: blur(1px);
+  opacity: 0;
+}
+
+@keyframes flame1 {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+  8%   { opacity: 0.7; }
+  25%  { opacity: 0.5; transform: translate(-30px, -120px) scale(0.7); }
+  50%  { opacity: 0.3; transform: translate(-15px, -250px) scale(0.4); }
+  75%  { opacity: 0.1; transform: translate(10px, -380px) scale(0.2); }
+  100% { opacity: 0; transform: translate(20px, -500px) scale(0.1); }
+}
+
+@keyframes flame2 {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.9); }
+  10%  { opacity: 0.6; }
+  30%  { opacity: 0.4; transform: translate(25px, -100px) scale(0.6); }
+  55%  { opacity: 0.2; transform: translate(40px, -220px) scale(0.3); }
+  80%  { opacity: 0.05; transform: translate(30px, -350px) scale(0.15); }
+  100% { opacity: 0; transform: translate(15px, -480px) scale(0.08); }
+}
+
+@keyframes flame3 {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1.2); }
+  6%   { opacity: 0.5; }
+  20%  { opacity: 0.4; transform: translate(-10px, -80px) scale(0.8); }
+  45%  { opacity: 0.2; transform: translate(-25px, -180px) scale(0.5); }
+  70%  { opacity: 0.08; transform: translate(-5px, -300px) scale(0.25); }
+  100% { opacity: 0; transform: translate(5px, -420px) scale(0.1); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Journal entry — dot+time (left of spine) | image+interp | AI log (right of spine)
+   ═══════════════════════════════════════════════════════════════════════ */
+.journal-entry {
+  display: grid;
+  /* dot | time | image+interp | gap | AI log */
+  grid-template-columns: 12px 12px 1fr 40px 1fr;
+  align-items: stretch;
+  padding-bottom: 32px;
+  position: relative;
+}
+
+.journal-entry:last-child {
+  padding-bottom: 0;
+}
+
+/* Dot — col 1, centered */
+.entry-node {
+  grid-column: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10px;
+  flex-shrink: 0;
+}
+
+/* Time — to the left of the spine, 30px gap (spine at left:6px → time at left:-30px) */
+.entry-time {
+  position: absolute;
+  left: -60px;
+  top: 9px;
+  font-size: 11px;
+  color: rgba(232, 220, 200, 0.4);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Tag — to the left of time, 30px gap */
+.entry-tag {
+  position: absolute;
+  left: -90px;
+  top: 23px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 2px 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Body: image + interpretation — col 3 */
+.entry-body {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+/* Right: AI journal text — col 5, height matches body */
+.entry-right {
+  grid-column: 5;
+  display: flex;
+  align-items: stretch;
+  padding-top: 6px;
+}
+
+.journal-entry-text {
+  font-family: 'ZCOOL XiaoWei', 'Noto Serif SC', 'STKaiti', 'KaiTi', '楷体', 'STSong', 'SimSun', serif;
+  font-size: 14px;
+  color: rgba(232, 220, 200, 0.85);
+  letter-spacing: 0.06em;
+  line-height: 2;
+  margin: 0;
+  width: 100%;
+  align-self: stretch;
+  animation: journalFlicker 4s ease-in-out infinite;
+  text-shadow:
+    0 0 8px rgba(212, 168, 83, 0.5),
+    0 0 20px rgba(212, 168, 83, 0.3),
+    0 0 40px rgba(212, 168, 83, 0.1);
+}
+
+.entry-ai .journal-entry-text {
+  color: rgba(122, 179, 212, 0.9);
+  text-shadow:
+    0 0 8px rgba(122, 179, 212, 0.5),
+    0 0 20px rgba(122, 179, 212, 0.25),
+    0 0 40px rgba(122, 179, 212, 0.1);
+  animation: journalFlickerAI 4s ease-in-out infinite;
+  animation-delay: -1.5s;
+}
+
+@keyframes journalFlicker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(212, 168, 83, 0.4), 0 0 20px rgba(212, 168, 83, 0.2), 0 0 40px rgba(212, 168, 83, 0.08); }
+  30%       { opacity: 0.88; text-shadow: 0 0 5px rgba(212, 168, 83, 0.25), 0 0 14px rgba(212, 168, 83, 0.12); }
+  55%       { opacity: 1; text-shadow: 0 0 12px rgba(212, 168, 83, 0.55), 0 0 28px rgba(212, 168, 83, 0.28), 0 0 50px rgba(212, 168, 83, 0.1); }
+  78%       { opacity: 0.92; text-shadow: 0 0 6px rgba(212, 168, 83, 0.3), 0 0 16px rgba(212, 168, 83, 0.15); }
+}
+
+@keyframes journalFlickerAI {
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(122, 179, 212, 0.5), 0 0 20px rgba(122, 179, 212, 0.25), 0 0 40px rgba(122, 179, 212, 0.1); }
+  22%       { opacity: 0.9; text-shadow: 0 0 5px rgba(122, 179, 212, 0.3), 0 0 14px rgba(122, 179, 212, 0.15); }
+  48%       { opacity: 1; text-shadow: 0 0 14px rgba(122, 179, 212, 0.6), 0 0 30px rgba(122, 179, 212, 0.32), 0 0 55px rgba(122, 179, 212, 0.12); }
+  72%       { opacity: 0.86; text-shadow: 0 0 4px rgba(122, 179, 212, 0.2), 0 0 12px rgba(122, 179, 212, 0.1); }
+}
+
+
+.entry-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.dot-user {
+  background: #d4a853;
+  box-shadow: 0 0 10px rgba(212, 168, 83, 0.6);
+}
+
+.dot-ai {
+  background: #7ab3d4;
+  box-shadow: 0 0 10px rgba(122, 179, 212, 0.6);
+}
+
+/* entry-body is now inside entry-left, grid placement removed */
+
+.tag-user {
+  color: #d4a853;
+  background: transparent;
+}
+
+.tag-ai {
+  color: #7ab3d4;
+  background: transparent;
+}
+
+/* Image with glow */
+.entry-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.entry-image-glow {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  filter: blur(30px);
+  opacity: 0.4;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.glow-user {
+  background: rgba(212, 168, 83, 0.5);
+}
+
+.glow-ai {
+  background: rgba(122, 179, 212, 0.5);
+}
+
+.entry-image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(232, 220, 200, 0.1);
+}
+
+.entry-interpretation {
+  font-size: 16px;
+  color: #e8dcc8;
+  letter-spacing: 0.08em;
+  line-height: 1.8;
+  font-style: italic;
+  text-shadow: 0 0 12px rgba(212, 168, 83, 0.2);
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Stats + Watermark
+   ═══════════════════════════════════════════════════════════════════════ */
+.book-stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.stat {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.stat-user {
+  color: #d4a853;
+}
+
+.stat-ai {
+  color: #7ab3d4;
+}
+
+.book-watermark {
+  text-align: center;
+  font-size: 11px;
+  color: rgba(232, 220, 200, 0.25);
+  letter-spacing: 0.12em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Footer
+   ═══════════════════════════════════════════════════════════════════════ */
+.journal-footer {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  border-top: 1px solid rgba(232, 220, 200, 0.08);
+}
+
+.export-btn {
+  padding: 10px 28px;
+  background: rgba(212, 168, 83, 0.15);
+  border: 1px solid rgba(212, 168, 83, 0.3);
+  border-radius: 8px;
+  color: #d4a853;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-btn:hover:not(:disabled) {
+  background: rgba(212, 168, 83, 0.25);
+  box-shadow: 0 0 15px rgba(212, 168, 83, 0.2);
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Export modal
+   ═══════════════════════════════════════════════════════════════════════ */
+.export-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.export-modal {
+  background: #12100e;
+  border: 1px solid rgba(232, 220, 200, 0.1);
+  border-radius: 12px;
+  padding: 30px 40px;
+  text-align: center;
+  max-width: 360px;
+}
+
+.export-modal h3 {
+  font-size: 16px;
+  font-weight: normal;
+  color: #e8dcc8;
+  margin: 0 0 12px 0;
+  letter-spacing: 0.1em;
+}
+
+.export-modal p {
+  font-size: 13px;
+  color: rgba(232, 220, 200, 0.5);
+  margin: 0 0 24px 0;
+  line-height: 1.6;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.export-confirm-btn {
+  padding: 10px 24px;
+  background: rgba(212, 168, 83, 0.8);
+  border: none;
+  border-radius: 8px;
+  color: #0d0b08;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.export-confirm-btn:hover {
+  opacity: 0.9;
+}
+
+.export-cancel-btn {
+  padding: 10px 24px;
+  background: transparent;
+  border: 1px solid rgba(232, 220, 200, 0.2);
+  border-radius: 8px;
+  color: rgba(232, 220, 200, 0.6);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-cancel-btn:hover {
+  border-color: rgba(232, 220, 200, 0.4);
+  color: #e8dcc8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Loading & Empty states
+   ═══════════════════════════════════════════════════════════════════════ */
+.journal-root.loading,
+.journal-root.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-text {
+  font-size: 14px;
+  color: rgba(232, 220, 200, 0.4);
+  letter-spacing: 0.1em;
+}
+
+.empty-content {
+  text-align: center;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: rgba(232, 220, 200, 0.4);
+  letter-spacing: 0.15em;
+  margin: 0 0 24px 0;
+}
+
+.back-btn {
+  padding: 10px 24px;
+  background: rgba(212, 168, 83, 0.15);
+  border: 1px solid rgba(212, 168, 83, 0.3);
+  border-radius: 8px;
+  color: #d4a853;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: rgba(212, 168, 83, 0.25);
+}

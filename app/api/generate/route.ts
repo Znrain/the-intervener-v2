@@ -1,3 +1,5 @@
+'use server'
+
 import OpenAI from 'openai'
 import sharp from 'sharp'
 import { addWorldState, addLog } from '@/lib/store'
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
       userIntent,
       previousInterpretation,
       spatialDetail,
+      scanImageUrl,
     }: {
       interpretation: string
       spatialDescription?: string
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
       userIntent?: 'agree' | 'reject' | 'modify' | 'initial'
       previousInterpretation?: string
       spatialDetail?: string
+      scanImageUrl?: string
     } = await request.json()
 
     // Build composition instruction from spatial detail (preferred) or spatial description
@@ -174,6 +178,7 @@ If the spatial structure describes only a few central elements, expand the scene
       interpretation,
       timestamp: Date.now(),
       triggeredBy,
+      scanImageUrl,
     }
 
     const fullLogEntry: LogEntry = {

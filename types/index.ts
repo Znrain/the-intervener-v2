@@ -4,6 +4,7 @@ export interface WorldState {
   interpretation: string
   timestamp: number
   triggeredBy: 'user' | 'ai'
+  scanImageUrl?: string
 }
 
 export interface ShapeObject {

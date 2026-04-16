@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { WorldState, LogEntry, ScanResult, ShapeObject } from '@/types'
 import ThreeBackground from './ThreeBackground'
 
@@ -126,6 +127,7 @@ function formatShapesAsNarrative(shapes: ShapeObject[]): string {
 }
 
 export default function IntervenorApp() {
+  const router = useRouter()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
@@ -141,6 +143,12 @@ export default function IntervenorApp() {
   const [latestInterpretation, setLatestInterpretation] = useState<string>('')
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null)
   const [selectedWorldStateId, setSelectedWorldStateId] = useState<string | null>(null)
+  const [highlightedLogId, setHighlightedLogId] = useState<string | null>(null)
+
+  // Sync highlightedLogId with selectedWorldStateId — left/right panel selection stays in sync
+  useEffect(() => {
+    setHighlightedLogId(selectedWorldStateId)
+  }, [selectedWorldStateId])
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null)
 
   // Evolution mode state
@@ -217,7 +225,7 @@ export default function IntervenorApp() {
   }, [])
 
   // Shared pipeline: base64 → scan → interpret → generate
-  const runPipeline = useCallback(async (base64: string, mimeType = 'image/jpeg') => {
+  const runPipeline = useCallback(async (base64: string, mimeType = 'image/jpeg', scanImageUrl?: string) => {
     console.log('[Pipeline] Starting pipeline', { mimeType, base64Length: base64.length })
     setPhase('scanning')
     setStatusMsg('正在识别形状……')
@@ -271,6 +279,7 @@ export default function IntervenorApp() {
       triggeredBy: 'user',
       userIntent: scan.userIntent,
       previousInterpretation: previousWorld?.interpretation,
+      scanImageUrl,
     }
     console.log('[Pipeline] → Sending to /api/generate:', genPayload)
     const genRes = await fetch('/api/generate', {
@@ -315,10 +324,9 @@ export default function IntervenorApp() {
     })
     setCapturedPreview(canvas.toDataURL('image/jpeg', 0.8))
     setUploadedPreview(null)
-    setCapturedPreview(null)
 
     try {
-      await runPipeline(base64, 'image/jpeg')
+      await runPipeline(base64, 'image/jpeg', canvas.toDataURL('image/jpeg', 0.8))
     } catch (err) {
       const msg = err instanceof Error ? err.message : '出现错误，请重试'
       setStatusMsg(msg)
@@ -344,7 +352,7 @@ export default function IntervenorApp() {
       setUploadedPreview(dataUrl)
       const base64 = dataUrl.split(',')[1]
       try {
-        await runPipeline(base64, mimeType)
+        await runPipeline(base64, mimeType, dataUrl)
       } catch (err) {
         const msg = err instanceof Error ? err.message : '出现错误，请重试'
         setStatusMsg(msg)
@@ -497,6 +505,10 @@ export default function IntervenorApp() {
     setSelectedWorldStateId(null)
   }, [])
 
+  const handleEndIntervention = useCallback(() => {
+    router.push('/journal')
+  }, [router])
+
   const isBusy = phase === 'scanning' || phase === 'interpreting' || phase === 'generating'
 
   // Build evolve particles — 16 slow drifting specks
@@ -582,7 +594,7 @@ export default function IntervenorApp() {
           [...worldData.logs].reverse().map((log) => (
             <div
               key={log.id}
-              className={`log-card log-card-${log.triggeredBy}`}
+              className={`log-card log-card-${log.triggeredBy}${highlightedLogId === log.worldStateId ? ' log-card-highlighted' : ''}`}
               onClick={() => handleSelectWorldState(log.worldStateId)}
             >
               <div className="log-time">{formatTime(log.timestamp)}</div>
@@ -604,7 +616,7 @@ export default function IntervenorApp() {
           [...worldData.worldStates].reverse().map((ws, i) => (
             <div
               key={ws.id}
-              className="timeline-card"
+              className={`timeline-card${selectedWorldStateId === ws.id ? ' timeline-card-highlighted' : ''}`}
               onClick={() => handleSelectWorldState(ws.id)}
             >
               {i > 0 && <div className="timeline-connector" />}
@@ -618,6 +630,41 @@ export default function IntervenorApp() {
 
       {/* Center column — Camera, world image, echo, status */}
       <div className="world-center">
+        {/* Mode toggle — 静观｜自生, above wait-prompt */}
+        <div className="evolve-mode-toggle">
+          <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'manual' ? 'mode-pill-active' : ''}`}>
+            静观
+          </button>
+          <span className="mode-separator">｜</span>
+          <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'auto' ? 'mode-pill-active' : ''}`}>
+            自生
+          </button>
+        </div>
+
+        {/* 等待介入提示 — 位于摄像头框上方 */}
+        {evolveMode !== 'auto' && (
+          <div className="wait-prompt">世界等待你的介入</div>
+        )}
+
+        {/* 自主模式状态 — 文字 + 间隔调整，位于摄像头框上方 */}
+        {evolveMode === 'auto' && (
+          <div className="auto-mode-status">
+            <span>世界在自行生长</span>
+            <div className="evolve-interval-control">
+              <span className="interval-label">每</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={evolveInterval}
+                onChange={(e) => handleIntervalChange(Number(e.target.value))}
+                className="interval-input"
+              />
+              <span className="interval-label">分钟</span>
+            </div>
+          </div>
+        )}
+
         {/* Camera pip — above world image, centered */}
         <div className="camera-pip">
           {!cameraReady && !cameraOpening && !cameraError && (
@@ -664,9 +711,38 @@ export default function IntervenorApp() {
           )}
         </div>
 
-        {/* Status */}
+        {/* Status — scan shape info */}
         <div className="world-status">
-          {statusMsg || (evolveMode === 'auto' ? '世界在自行生长' : '世界等待你的介入')}
+          {lastScan && lastScan.shapes.length > 0 ? (
+            <div className="scan-info-display">
+              {(() => {
+                const shapeCounts: Record<string, number> = {}
+                lastScan.shapes.forEach(s => {
+                  const name = shapeNameMap[s.type] || s.type
+                  shapeCounts[name] = (shapeCounts[name] || 0) + 1
+                })
+                const shapeTags = Object.entries(shapeCounts)
+                  .map(([name, count]) => `${name} × ${count}`)
+                  .join('  ')
+                return (
+                  <>
+                    <span className={`scan-intent scan-intent-${lastScan.userIntent}`}>
+                      {lastScan.userIntent === 'agree' ? '继续这个方向' :
+                       lastScan.userIntent === 'reject' ? '换个方向' :
+                       lastScan.userIntent === 'modify' ? '做出修正' :
+                       lastScan.userIntent === 'initial' ? '初次介入' : ''}
+                    </span>
+                    <span className="scan-shapes-label">{shapeTags}</span>
+                    {lastScan.spatialRelationships && (
+                      <span className="scan-spatial-note">{lastScan.spatialRelationships}</span>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          ) : (
+            null
+          )}
         </div>
       </div>
 
@@ -675,6 +751,17 @@ export default function IntervenorApp() {
         <div className="controls-row">
           <button onClick={handleScan} disabled={isBusy || !cameraReady} className={`scan-btn${phase === 'scanning' ? ' scan-btn-ripple' : ''}`}>
             {isBusy ? '处理中…' : '扫描'}
+          </button>
+          <button onClick={handleEvolveManual} disabled={isBusy} className="evolve-once-btn" title="演化一次">
+            {/* Ancient Greek triskelion spiral — three-legged meander */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+              <path d="M12 12 C12 8, 8 6, 5 7 C8 7, 11 9, 12 12"/>
+              <path d="M12 12 C14 10, 16 7, 17 4 C17 7, 14 10, 12 12"/>
+              <path d="M12 12 C14 14, 16 17, 14 20 C14 17, 13 15, 12 12"/>
+              <path d="M12 12 C10 14, 7 17, 4 16 C7 16, 10 14, 12 12"/>
+              <path d="M12 12 C10 10, 7 7, 10 4 C10 7, 11 9, 12 12"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+            </svg>
           </button>
           <button onClick={handleUploadClick} disabled={isBusy} className="upload-btn">
             上传图片
@@ -686,42 +773,19 @@ export default function IntervenorApp() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <button onClick={handleRestart} disabled={isBusy} className="restart-btn" title="重新开始">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-            </svg>
-          </button>
         </div>
-
-        <div className="evolve-controls">
-          <button onClick={handleEvolveManual} disabled={isBusy} className="evolve-once-btn">
-            演化一次
-          </button>
-          <div className="evolve-mode-toggle">
-            <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'manual' ? 'mode-pill-active' : ''}`}>
-              静观
-            </button>
-            <button onClick={handleToggleMode} className={`mode-pill ${evolveMode === 'auto' ? 'mode-pill-active' : ''}`}>
-              自生
-            </button>
-          </div>
-          {evolveMode === 'auto' && (
-            <div className="evolve-interval-control">
-              <span className="interval-label">每</span>
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={evolveInterval}
-                onChange={(e) => handleIntervalChange(Number(e.target.value))}
-                className="interval-input"
-              />
-              <span className="interval-label">分钟</span>
-            </div>
-          )}
-        </div>
+        <button onClick={handleEndIntervention} className="end-btn">
+          结束介入
+        </button>
       </div>
+
+      {/* Reset button — top-right corner */}
+      <button onClick={handleRestart} disabled={isBusy} className="reset-fixed" title="重新开始">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
 
       <canvas ref={canvasRef} className="hidden" />
     </div>

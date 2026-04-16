@@ -1,3 +1,5 @@
+'use server'
+
 import OpenAI from 'openai'
 import { getLastScan, setLastScan } from '@/lib/store'
 import type { ScanResult, ShapeObject } from '@/types'
