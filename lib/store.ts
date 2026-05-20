@@ -7,36 +7,81 @@ interface Store {
   lastScanResult: ScanResult | null
 }
 
-// Use globalThis to survive Next.js hot-reload in development
-const globalStore = globalThis as typeof globalThis & { __store?: Store }
-
-if (!globalStore.__store) {
-  globalStore.__store = {
-    worldStates: [],
-    logs: [],
-    lastScanResult: null,
-  }
+// Session store: Map<sessionId, Store>
+interface GlobalStore {
+  __sessionStore?: Map<string, Store>
 }
 
-export const store = globalStore.__store
+// Use globalThis to survive Next.js hot-reload in development
+const globalStore = globalThis as GlobalStore
 
-export function getLatestWorldState(): WorldState | null {
+function getSessionStore(): Map<string, Store> {
+  if (!globalStore.__sessionStore) {
+    globalStore.__sessionStore = new Map()
+  }
+  return globalStore.__sessionStore
+}
+
+function getOrCreateSessionStore(sessionId: string): Store {
+  const sessionStore = getSessionStore()
+  if (!sessionStore.has(sessionId)) {
+    sessionStore.set(sessionId, {
+      worldStates: [],
+      logs: [],
+      lastScanResult: null,
+    })
+  }
+  return sessionStore.get(sessionId)!
+}
+
+export function getLatestWorldState(sessionId: string): WorldState | null {
+  const store = getOrCreateSessionStore(sessionId)
   const states = store.worldStates
   return states.length > 0 ? states[states.length - 1] : null
 }
 
-export function addWorldState(state: WorldState) {
+export function addWorldState(sessionId: string, state: WorldState) {
+  const store = getOrCreateSessionStore(sessionId)
   store.worldStates.push(state)
 }
 
-export function addLog(entry: LogEntry) {
+export function addLog(sessionId: string, entry: LogEntry) {
+  const store = getOrCreateSessionStore(sessionId)
   store.logs.push(entry)
 }
 
-export function setLastScan(result: ScanResult) {
+export function setLastScan(sessionId: string, result: ScanResult) {
+  const store = getOrCreateSessionStore(sessionId)
   store.lastScanResult = result
 }
 
-export function getLastScan(): ScanResult | null {
+export function getLastScan(sessionId: string): ScanResult | null {
+  const store = getOrCreateSessionStore(sessionId)
   return store.lastScanResult
+}
+
+export function resetSession(sessionId: string) {
+  const sessionStore = getSessionStore()
+  sessionStore.set(sessionId, {
+    worldStates: [],
+    logs: [],
+    lastScanResult: null,
+  })
+}
+
+export function getAllWorldStates(sessionId: string): WorldState[] {
+  const store = getOrCreateSessionStore(sessionId)
+  return store.worldStates
+}
+
+export function getAllLogs(sessionId: string): LogEntry[] {
+  const store = getOrCreateSessionStore(sessionId)
+  return store.logs
+}
+
+// Legacy export — for backwards compatibility if needed, but all routes should use sessionId
+export const store = {
+  get worldStates() { return [] },
+  get logs() { return [] },
+  get lastScanResult() { return null },
 }

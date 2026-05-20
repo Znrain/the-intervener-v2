@@ -6,6 +6,14 @@ export const metadata: Metadata = {
   description: '一个由物理积木驱动、能够自主演化的AI生成世界系统',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#0a0a0f',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {

@@ -1,10 +1,13 @@
 'use server'
 
-import { store } from '@/lib/store'
+import { getSessionId, withSessionCookie } from '@/lib/session'
+import { getAllWorldStates, getAllLogs } from '@/lib/store'
 
-export async function GET() {
-  return Response.json({
-    worldStates: store.worldStates,
-    logs: store.logs,
-  })
+export async function GET(request: Request) {
+  const { sessionId, setCookie, cookieHeader } = getSessionId(request)
+  const data = {
+    worldStates: getAllWorldStates(sessionId),
+    logs: getAllLogs(sessionId),
+  }
+  return withSessionCookie(data, 200, setCookie ? cookieHeader : '')
 }

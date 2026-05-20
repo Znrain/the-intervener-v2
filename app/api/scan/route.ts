@@ -1,21 +1,23 @@
 'use server'
 
-import OpenAI from 'openai'
+import { getSessionId, withSessionCookie } from '@/lib/session'
 import { getLastScan, setLastScan } from '@/lib/store'
 import type { ScanResult, ShapeObject } from '@/types'
+import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(request: Request) {
   try {
+    const { sessionId, setCookie, cookieHeader } = getSessionId(request)
     const { imageBase64, mimeType = 'image/jpeg' } = await request.json()
-    console.log('[API/scan] Received request', { imageBase64Length: imageBase64?.length, mimeType })
+    console.log('[API/scan] Received request', { imageBase64Length: imageBase64?.length, mimeType, sessionId })
 
     if (!imageBase64) {
-      return Response.json({ error: '缺少图片数据' }, { status: 400 })
+      return withSessionCookie({ error: '缺少图片数据' }, 400, setCookie ? cookieHeader : '')
     }
 
-    const lastScan = getLastScan()
+    const lastScan = getLastScan(sessionId)
     const isInitial = lastScan === null
 
     const systemPrompt = `You observe physical shapes (blocks, objects) placed on a flat surface and output a structured description suitable for image generation.
@@ -80,7 +82,6 @@ Rules:
     const currentCount: number = raw.shapeCount ?? (raw.shapes?.length ?? 0)
     const lastCount = lastScan ? lastScan.shapes.length : 0
 
-    // Extract shape type names for comparison
     const currentShapeNames: string[] = (raw.shapes as { type: string }[])?.map((s) => s.type) ?? []
     const lastShapeNames: string[] = lastScan?.shapes.map((s) => s.type) ?? []
 
@@ -88,12 +89,7 @@ Rules:
     let userIntent: ScanResult['userIntent'] = 'initial'
     let changeDescription = ''
 
-    if (isInitial) {
-      changeFromLast = 'none'
-      userIntent = 'initial'
-      changeDescription = ''
-    } else {
-      // Generate detailed change description using GPT-4o
+    if (!isInitial) {
       const changeAnalysisPrompt = `你是一个观察积木变化的AI。
 
 上次扫描：${lastShapeNames.join('、')}
@@ -118,7 +114,6 @@ Rules:
 
       changeDescription = changeAnalysis.choices[0].message.content?.trim() ?? ''
 
-      // Determine change type and intent
       if (currentCount > lastCount) {
         changeFromLast = 'added'
         userIntent = 'agree'
@@ -144,14 +139,15 @@ Rules:
       changeDescription,
     }
 
-    setLastScan(result)
+    setLastScan(sessionId, result)
     console.log('[API/scan] Returning result:', result)
-    return Response.json(result)
+    return withSessionCookie(result, 200, setCookie ? cookieHeader : '')
   } catch (err) {
     console.error('[scan]', err)
-    return Response.json(
+    return withSessionCookie(
       { error: err instanceof Error ? err.message : '识别失败' },
-      { status: 500 }
+      500,
+      ''
     )
   }
 }

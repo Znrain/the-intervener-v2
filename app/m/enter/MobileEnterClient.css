@@ -1,0 +1,126 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile Enter Page — 光晕入口
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.m-enter-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #04040a;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+.m-enter-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.m-enter-expand {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.m-enter-dissolve {
+  position: absolute;
+  inset: 0;
+  background: #04040a;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.m-enter-text {
+  position: absolute;
+  bottom: 28%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: rgba(232, 220, 200, 0.6);
+  z-index: 5;
+  pointer-events: none;
+  text-shadow: 0 0 20px rgba(212, 168, 83, 0.3);
+}
+
+/* Orb button — center of screen */
+.m-enter-orb {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.m-enter-orb-ring {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 168, 83, 0.4);
+  animation: orbRing 2.5s ease-in-out infinite;
+}
+
+.m-enter-orb-ring::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 168, 83, 0.2);
+  animation: orbRing 2.5s ease-in-out infinite 0.3s;
+}
+
+.m-enter-orb-core {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%,
+    rgba(255, 248, 220, 0.9) 0%,
+    rgba(255, 215, 100, 0.7) 40%,
+    rgba(212, 150, 60, 0.4) 70%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 20px rgba(255, 215, 100, 0.6),
+    0 0 40px rgba(212, 168, 83, 0.4),
+    0 0 60px rgba(212, 168, 83, 0.2);
+  animation: orbPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes orbRing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes orbPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(255, 215, 100, 0.6),
+      0 0 40px rgba(212, 168, 83, 0.4),
+      0 0 60px rgba(212, 168, 83, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 215, 100, 0.8),
+      0 0 60px rgba(212, 168, 83, 0.5),
+      0 0 90px rgba(212, 168, 83, 0.3);
+  }
+}
