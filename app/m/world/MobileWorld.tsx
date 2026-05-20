@@ -409,16 +409,17 @@ export default function MobileWorld() {
           </button>
 
           <div className="mw-camera-wrap">
-            <label className="mw-camera-label-wrap" htmlFor="mobile-cam-input">
-              <div className={`mw-camera-ring ${isBusy ? 'busy' : ''}`}>
-                <button
-                  className={`mw-camera-core ${isBusy ? 'busy' : ''}`}
-                  disabled={isBusy}
-                  aria-label="拍照介入"
-                />
-              </div>
-              <span className="mw-camera-label">{isBusy ? '处理中…' : '拍照介入'}</span>
-            </label>
+            <div
+              className={`mw-camera-ring ${isBusy ? 'busy' : ''}`}
+              onClick={!isBusy ? () => fileInputRef.current?.click() : undefined}
+              role="button"
+              aria-label="拍照介入"
+              tabIndex={0}
+              onKeyDown={!isBusy ? (e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() } : undefined}
+            >
+              <div className="mw-camera-core" />
+            </div>
+            <span className="mw-camera-label">{isBusy ? '处理中…' : '拍照介入'}</span>
           </div>
           <input
             id="mobile-cam-input"
