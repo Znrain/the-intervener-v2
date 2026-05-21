@@ -495,9 +495,12 @@
 }
 
 .mw-camera-ring.busy {
-  opacity: 0.4;
-  cursor: not-allowed;
-  animation: none;
+  animation: cameraRingBusy 1.2s ease-in-out infinite !important;
+}
+
+@keyframes cameraRingBusy {
+  0%, 100% { transform: scale(1); border-color: rgba(212, 168, 83, 0.45); }
+  50% { transform: scale(1.08); border-color: rgba(122, 179, 212, 0.6); box-shadow: 0 0 20px rgba(122, 179, 212, 0.3); }
 }
 
 .mw-camera-ring:hover:not(.busy) {
@@ -663,17 +666,20 @@
 /* Center column: narrower to give side panels more space */
 .mw-land-center {
   position: fixed;
-  top: 48%;
+  top: 60px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 34%;
   max-width: 600px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding-top: 20px;
+  padding-top: 16px;
+  padding-bottom: 80px;
   z-index: 5;
+  overflow-y: auto;
+  max-height: calc(100vh - 60px);
 }
 
 /* Image with overflow hidden */
@@ -772,23 +778,36 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: rgba(10, 10, 15, 0.85);
+  gap: 12px;
+  background: rgba(10, 10, 15, 0.88);
   border-radius: 8px;
   z-index: 6;
+  animation: scanOverlayFadeIn 0.3s ease-out;
+}
+
+@keyframes scanOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .mw-land-scanning-label {
-  font-size: 12px;
-  color: rgba(212, 168, 83, 0.8);
-  letter-spacing: 0.15em;
+  font-size: 14px;
+  color: rgba(212, 168, 83, 1);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(212, 168, 83, 0.6);
+  animation: scanLabelPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes scanLabelPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 .mw-land-scanning-detail {
-  font-size: 13px;
-  color: rgba(232, 220, 200, 0.6);
-  letter-spacing: 0.08em;
+  font-size: 14px;
+  color: rgba(232, 220, 200, 0.8);
+  letter-spacing: 0.1em;
   text-align: center;
   max-width: 90%;
   line-height: 1.6;
@@ -796,7 +815,7 @@
 
 .mw-land-scanning-dots {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .mw-land-scanning-dot {
@@ -1015,6 +1034,88 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
+}
+
+/* Dedicated processing indicator — shown when no world exists yet */
+.mw-land-processing-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 20px;
+  background: rgba(10, 10, 15, 0.82);
+  border: 1px solid rgba(212, 168, 83, 0.18);
+  border-radius: 10px;
+  animation: procIndicatorFadeIn 0.4s ease-out;
+  min-height: 180px;
+  justify-content: center;
+}
+
+@keyframes procIndicatorFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.mw-land-processing-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mw-land-processing-label {
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  color: rgba(212, 168, 83, 0.9);
+  text-shadow: 0 0 15px rgba(212, 168, 83, 0.5);
+}
+
+.mw-land-processing-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mw-proc-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgba(232, 220, 200, 0.35);
+  transition: all 0.3s ease;
+}
+
+.mw-proc-step.active {
+  color: rgba(212, 168, 83, 0.85);
+  text-shadow: 0 0 10px rgba(212, 168, 83, 0.4);
+}
+
+.mw-proc-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(232, 220, 200, 0.25);
+  transition: all 0.3s ease;
+}
+
+.mw-proc-step.active .mw-proc-dot {
+  background: rgba(212, 168, 83, 0.8);
+  box-shadow: 0 0 8px rgba(212, 168, 83, 0.5);
+}
+
+.mw-proc-arrow {
+  font-size: 12px;
+  color: rgba(232, 220, 200, 0.2);
+  margin-bottom: 10px;
+}
+
+.mw-land-processing-detail {
+  font-size: 12px;
+  color: rgba(232, 220, 200, 0.55);
+  letter-spacing: 0.1em;
+  text-align: center;
+  min-height: 18px;
 }
 
 /* Visually hide the file input — functional but invisible */

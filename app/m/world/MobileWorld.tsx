@@ -329,6 +329,41 @@ export default function MobileWorld() {
 
       {/* Center: world display */}
       <div className="mw-land-center">
+        {/* Dedicated processing indicator - always visible during pipeline */}
+        {isBusy && !currentWorld && (
+          <div className="mw-land-processing-indicator">
+            <div className="mw-land-processing-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(212,168,83,0.8)" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.3"/>
+                <path d="M12 2 C12 2, 12 12, 12 12">
+                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="2s" repeatCount="indefinite"/>
+                </path>
+              </svg>
+            </div>
+            <div className="mw-land-processing-label">
+              {phase === 'scanning' ? '正在识别' : phase === 'interpreting' ? '正在解读' : '正在生成'}
+            </div>
+            <div className="mw-land-processing-steps">
+              <div className={`mw-proc-step ${phase === 'scanning' ? 'active' : ''}`}>
+                <span className="mw-proc-dot" />
+                <span>识别</span>
+              </div>
+              <span className="mw-proc-arrow">→</span>
+              <div className={`mw-proc-step ${phase === 'interpreting' ? 'active' : ''}`}>
+                <span className="mw-proc-dot" />
+                <span>解读</span>
+              </div>
+              <span className="mw-proc-arrow">→</span>
+              <div className={`mw-proc-step ${phase === 'generating' ? 'active' : ''}`}>
+                <span className="mw-proc-dot" />
+                <span>生成</span>
+              </div>
+            </div>
+            <div className="mw-land-processing-detail">{statusMsg}</div>
+          </div>
+        )}
+
+        {/* Image area */}
         <div className="mw-land-image-wrap">
           {currentWorld ? (
             <>
@@ -336,14 +371,12 @@ export default function MobileWorld() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={currentWorld.imageUrl} alt="世界" className="mw-land-image" />
             </>
-          ) : (
+          ) : !isBusy ? (
             <div className="mw-land-void">
-              <p className="mw-land-void-text">
-                {isBusy ? (statusMsg || '处理中…') : '世界尚未诞生'}
-              </p>
-              {!isBusy && <p className="mw-land-void-sub">拍摄物品，开始介入</p>}
+              <p className="mw-land-void-text">世界尚未诞生</p>
+              <p className="mw-land-void-sub">拍摄物品，开始介入</p>
             </div>
-          )}
+          ) : null}
 
           {/* Uploaded preview as pip — top-left of world image */}
           {uploadedPreview && (
@@ -354,8 +387,8 @@ export default function MobileWorld() {
             </div>
           )}
 
-          {/* Scanning/interpreting overlay */}
-          {(phase === 'scanning' || phase === 'interpreting' || phase === 'generating') && (
+          {/* Scanning overlay on top of existing world image */}
+          {currentWorld && isBusy && (
             <div className="mw-land-scanning-overlay">
               <span className="mw-land-scanning-label">
                 {phase === 'scanning' ? '识别中' : phase === 'interpreting' ? '解读中' : '生成中'}
