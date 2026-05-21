@@ -158,19 +158,41 @@ export default function MobileWorld() {
     }
     console.log('[MobileWorld] File captured:', file.name, file.size, file.type)
 
+    // Compress image before sending to API
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string
-      console.log('[MobileWorld] FileReader loaded, dataUrl length:', dataUrl.length)
-      setUploadedPreview(dataUrl)
-      const base64 = dataUrl.split(',')[1]
-      console.log('[MobileWorld] Calling runPipeline with base64 length:', base64.length)
-      try {
-        await runPipeline(base64, file.type || 'image/jpeg', dataUrl)
-        console.log('[MobileWorld] Pipeline completed')
-      } catch (err) {
-        console.error('[MobileWorld] Pipeline error:', err)
+      console.log('[MobileWorld] FileReader loaded, original length:', dataUrl.length)
+
+      // Resize image to max 800px width to avoid 413 error
+      const img = new window.Image()
+      img.onload = async () => {
+        const MAX_W = 800
+        const scale = Math.min(1, MAX_W / img.width)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        console.log('[MobileWorld] Resized to', w, 'x', h, 'length:', resizedDataUrl.length)
+
+        setUploadedPreview(resizedDataUrl)
+        const base64 = resizedDataUrl.split(',')[1]
+        console.log('[MobileWorld] Calling runPipeline with base64 length:', base64.length)
+        try {
+          await runPipeline(base64, 'image/jpeg', resizedDataUrl)
+          console.log('[MobileWorld] Pipeline completed')
+        } catch (err) {
+          console.error('[MobileWorld] Pipeline error:', err)
+        }
       }
+      img.onerror = () => {
+        console.error('[MobileWorld] Image load error')
+      }
+      img.src = dataUrl
     }
     reader.onerror = () => {
       console.error('[MobileWorld] FileReader error')
