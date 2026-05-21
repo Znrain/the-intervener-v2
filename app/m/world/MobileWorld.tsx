@@ -86,33 +86,41 @@ export default function MobileWorld() {
 
   // Shared pipeline
   const runPipeline = useCallback(async (base64: string, mimeType = 'image/jpeg', scanImageUrl?: string) => {
+    console.log('[MobileWorld] runPipeline called, base64 length:', base64.length, 'mimeType:', mimeType)
     setPhase('scanning')
     setStatusMsg('正在识别…')
     try {
+      console.log('[MobileWorld] Calling /api/scan...')
       const scanRes = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64, mimeType }),
       })
+      console.log('[MobileWorld] /api/scan status:', scanRes.status)
       if (!scanRes.ok) throw new Error('识别失败')
       const scan: ScanResult = await scanRes.json()
+      console.log('[MobileWorld] scan result:', JSON.stringify(scan).slice(0, 200))
       setLastScan(scan)
       setStatusMsg(`识别：${formatShapesAsNarrative(scan.shapes)}`)
 
       setPhase('interpreting')
       setStatusMsg('正在解读…')
+      console.log('[MobileWorld] Calling /api/interpret...')
       const interpretRes = await fetch('/api/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scan),
       })
+      console.log('[MobileWorld] /api/interpret status:', interpretRes.status)
       if (!interpretRes.ok) throw new Error('解读失败')
       const { interpretation, spatialDescription, logEntry } = await interpretRes.json()
+      console.log('[MobileWorld] interpretation:', interpretation)
 
       setPhase('generating')
       setStatusMsg('正在生成…')
       const previousWorld = worldData.worldStates.length > 0
         ? worldData.worldStates[worldData.worldStates.length - 1] : null
+      console.log('[MobileWorld] Calling /api/generate...')
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,13 +134,16 @@ export default function MobileWorld() {
           scanImageUrl,
         }),
       })
+      console.log('[MobileWorld] /api/generate status:', genRes.status)
       if (!genRes.ok) throw new Error('生成失败')
       await genRes.json()
 
       await refreshWorld()
+      console.log('[MobileWorld] refreshWorld done')
       setStatusMsg('世界已更新')
       setPhase('done')
     } catch (err) {
+      console.error('[MobileWorld] Pipeline error:', err)
       setStatusMsg(err instanceof Error ? err.message : '出错')
       setPhase('idle')
     }
@@ -141,19 +152,28 @@ export default function MobileWorld() {
   // Camera / file upload
   const handleCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
+    if (!file) {
+      console.error('[MobileWorld] No file selected')
+      return
+    }
+    console.log('[MobileWorld] File captured:', file.name, file.size, file.type)
 
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string
+      console.log('[MobileWorld] FileReader loaded, dataUrl length:', dataUrl.length)
       setUploadedPreview(dataUrl)
       const base64 = dataUrl.split(',')[1]
+      console.log('[MobileWorld] Calling runPipeline with base64 length:', base64.length)
       try {
         await runPipeline(base64, file.type || 'image/jpeg', dataUrl)
+        console.log('[MobileWorld] Pipeline completed')
       } catch (err) {
-        console.error(err)
+        console.error('[MobileWorld] Pipeline error:', err)
       }
+    }
+    reader.onerror = () => {
+      console.error('[MobileWorld] FileReader error')
     }
     reader.readAsDataURL(file)
   }, [runPipeline])
@@ -416,6 +436,7 @@ export default function MobileWorld() {
               aria-label="拍照介入"
               tabIndex={0}
               onKeyDown={!isBusy ? (e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() } : undefined}
+              style={{ cursor: isBusy ? 'not-allowed' : 'pointer' }}
             >
               <div className="mw-camera-core" />
             </div>
@@ -428,6 +449,7 @@ export default function MobileWorld() {
             accept="image/*"
             capture="environment"
             onChange={handleCapture}
+            style={{ position: 'fixed', width: '1px', height: '1px', opacity: 0, left: '-9999px', top: '-9999px' }}
           />
 
           <button
