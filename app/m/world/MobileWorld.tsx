@@ -450,14 +450,13 @@ export default function MobileWorld() {
             </svg>
           </button>
 
-          <div className="mw-camera-wrap">
+          <div className="mw-camera-wrap" style={{ position: 'relative' }}>
+            {/* Label overlay covering the entire camera wrap area */}
+            <label htmlFor="mobile-cam-input" style={{
+              position: 'absolute', inset: 0, cursor: isBusy ? 'not-allowed' : 'pointer', zIndex: 1,
+            }} />
             <div
               className={`mw-camera-ring ${isBusy ? 'busy' : ''}`}
-              onClick={!isBusy ? () => fileInputRef.current?.click() : undefined}
-              role="button"
-              aria-label="拍照介入"
-              tabIndex={0}
-              onKeyDown={!isBusy ? (e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() } : undefined}
               style={{ cursor: isBusy ? 'not-allowed' : 'pointer' }}
             >
               <div className="mw-camera-core" />
@@ -471,7 +470,7 @@ export default function MobileWorld() {
             accept="image/*"
             capture="environment"
             onChange={handleCapture}
-            style={{ position: 'fixed', width: '1px', height: '1px', opacity: 0, left: '-9999px', top: '-9999px' }}
+            style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none', zIndex: -1 }}
           />
 
           <button
